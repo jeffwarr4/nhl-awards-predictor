@@ -1,0 +1,36 @@
+{
+  "numeric_features": [
+    "Age",
+    "GP",
+    "G",
+    "A",
+    "PTS",
+    "+/-",
+    "PIM",
+    "SOG",
+    "SPCT",
+    "PPG",
+    "SHG",
+    "G_per_GP",
+    "A_per_GP",
+    "PTS_per_GP",
+    "SOG_per_GP",
+    "PPG_per_GP",
+    "SHG_per_GP",
+    "team_win_pct",
+    "is_goalie",
+    "SV%",
+    "GAA",
+    "GSAA",
+    "QS%",
+    "GPS"
+  ],
+  "categorical_features": [
+    "Pos"
+  ],
+  "test_seasons": [
+    2023,
+    2024,
+    2025
+  ]
+}

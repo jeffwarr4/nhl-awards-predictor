@@ -1,0 +1,7 @@
+cd "C:\Users\jeffw\OneDrive\DevProj\mlb-awards"
+python -m venv C:\DevVenvs\gomotion_attendance-venv
+
+ & C:\DevVenvs\nfl-awards-predictor-venv\Scripts\Activate.ps1
+
+cd "C:\DevVenvs\nhl-awards-venv"
+python -m venv .venv

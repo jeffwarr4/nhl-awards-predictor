@@ -1,0 +1,34 @@
+{
+  "numeric_features": [
+    "Age",
+    "GP",
+    "G",
+    "A",
+    "PTS",
+    "G_per_GP",
+    "A_per_GP",
+    "PTS_per_GP",
+    "SOG_per_GP",
+    "PPG",
+    "PPG_per_GP",
+    "team_win_pct",
+    "PTS_team",
+    "is_goalie"
+  ],
+  "categorical_features": [
+    "Pos"
+  ],
+  "test_seasons": [
+    2023,
+    2024,
+    2025
+  ],
+  "targets": {
+    "regression": "vote_share",
+    "classification": "is_top5"
+  },
+  "models": {
+    "regression_model_path": "C:\\Users\\jeffw\\OneDrive\\DevProj\\nhl-awards-predictor\\Models\\Artifacts\\hart_vote_reg_v2.pkl",
+    "top5_classifier_path": "C:\\Users\\jeffw\\OneDrive\\DevProj\\nhl-awards-predictor\\Models\\Artifacts\\hart_top5_clf_v2.pkl"
+  }
+}
