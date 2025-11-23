@@ -24,11 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run current-season predictions (v2)
+      - name: "Run current-season predictions (v2)"
         run: |
           python Models/nhl_predict_current.py
 
-      - name: Debug: list repo & processed outputs
+      - name: "Debug: list repo & processed outputs"
         run: |
           echo "=== Repo root ==="
           pwd
@@ -41,7 +41,7 @@ jobs:
             echo "Data/Processed directory does NOT exist"
           fi
 
-      - name: Move flattened outputs to Pages directory
+      - name: "Move flattened outputs to Pages directory"
         run: |
           mkdir -p pages
 
@@ -68,12 +68,12 @@ jobs:
 
           if [ -n "$latest_full" ]; then
             echo "Copying $latest_full → pages/nhl_hart_predictions_v2_latest.csv"
-            cp "$latest_full" pages/nhl_hart_predictions_v2_latest.csv"
+            cp "$latest_full" pages/nhl_hart_predictions_v2_latest.csv
           else
             echo "WARNING: No nhl_hart_predictions_v2_*.csv found"
           fi
 
-      - name: Commit CSV outputs
+      - name: "Commit CSV outputs"
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -81,7 +81,7 @@ jobs:
           git add pages/*.csv 2>/dev/null || echo "No CSVs to add"
           git commit -m "Automated NHL predictions update" || echo "No changes to commit."
 
-      - name: Push to main
+      - name: "Push to main"
         uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
