@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+
+# Allow model artifacts (override *.pkl ignore rule)
+!Models/Artifacts/*.pkl
+
+# Ignore all other pickle files
 *.pkl
 
 # Virtual environments
