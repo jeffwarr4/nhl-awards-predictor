@@ -593,8 +593,8 @@ def export_flat_block(
     Export a flattened CSV covering ranks [start_rank, end_rank].
 
     Example:
-      label="top5"   -> nhl_hart_top5_flat_2026.csv   (r1–r5)
-      label="6to10"  -> nhl_hart_6to10_flat_2026.csv  (r6–r10)
+      label="top5"   -> top5.csv   (r1–r5)
+      label="6to10"  -> top6to10.csv  (r6–r10)
 
     Each row = one run_date, with columns like:
       r1_player, r1_team, ..., r5_player, ...
