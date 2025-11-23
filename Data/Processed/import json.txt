@@ -1,0 +1,418 @@
+import json
+import time
+from datetime import datetime
+from io import StringIO
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import requests
+import joblib
+import re
+
+# ---------------------------------------------
+# PATHS
+# ---------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+DATA_PROCESSED_DIR = PROJECT_ROOT / "Data" / "Processed"
+DATA_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+
+ARTIFACTS_DIR = PROJECT_ROOT / "Models" / "Artifacts"
+MODEL_PATH = ARTIFACTS_DIR / "hart_model.pkl"
+FEATURES_PATH = ARTIFACTS_DIR / "hart_features.json"
+
+# ---------------------------------------------
+# TEAM NAME → ABBR MAP
+# (for standings, which use full names)
+# ---------------------------------------------
+TEAM_NAME_TO_ABBR = {
+    "Anaheim Ducks": "ANA",
+    "Arizona Coyotes": "ARI",
+    "Boston Bruins": "BOS",
+    "Buffalo Sabres": "BUF",
+    "Calgary Flames": "CGY",
+    "Carolina Hurricanes": "CAR",
+    "Chicago Blackhawks": "CHI",
+    "Colorado Avalanche": "COL",
+    "Columbus Blue Jackets": "CBJ",
+    "Dallas Stars": "DAL",
+    "Detroit Red Wings": "DET",
+    "Edmonton Oilers": "EDM",
+    "Florida Panthers": "FLA",
+    "Los Angeles Kings": "LAK",
+    "Minnesota Wild": "MIN",
+    "Montreal Canadiens": "MTL",
+    "Nashville Predators": "NSH",
+    "New Jersey Devils": "NJD",
+    "New Jerse Devils": "NJD",
+    "New York Islanders": "NYI",
+    "New York Rangers": "NYR",
+    "New ork Rangers": "NYR",
+    "Ottawa Senators": "OTT",
+    "Philadelphia Flyers": "PHI",
+    "Pittsburgh Penguins": "PIT",
+    "San Jose Sharks": "SJS",
+    "Seattle Kraken": "SEA",
+    "St. Louis Blues": "STL",
+    "Tampa Bay Lightning": "TBL",
+    "Tampa Ba Lightning": "TBL",
+    "Toronto Maple Leafs": "TOR",
+    "Utah Mammoth": "UTA",
+    "Utah Hockey Club": "UTA",
+    "Vancouver Canucks": "VAN",
+    "Vegas Golden Knights": "VEG",  # matches skater table you showed (VEG)
+    "Washington Capitals": "WSH",
+    "Winnipeg Jets": "WPG",
+}
+
+# ---------------------------------------------
+# ENCODING FIX
+# ---------------------------------------------
+def fix_name_encoding(text):
+    if not isinstance(text, str):
+        return text
+    try:
+        return text.encode("latin1").decode("utf8")
+    except Exception:
+        return text
+
+# ---------------------------------------------
+# HTTP FETCH WITH RETRY
+# ---------------------------------------------
+def fetch_html(url: str, max_retries: int = 5, base_delay: int = 5) -> str:
+    for attempt in range(max_retries):
+        print(f"[DEBUG] Fetching URL (attempt {attempt + 1}/{max_retries}): {url}")
+        try:
+            r = requests.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=20,
+            )
+        except requests.RequestException as e:
+            wait = base_delay * (2 ** attempt)
+            print(f"[WARN] Request error {e}. Backing off {wait} seconds...")
+            time.sleep(wait)
+            continue
+
+        status = r.status_code
+        if status == 429 or (500 <= status < 600):
+            wait = base_delay * (2 ** attempt)
+            print(f"[WARN] Status {status} for {url}. Backing off {wait} seconds...")
+            time.sleep(wait)
+            continue
+
+        if status != 200:
+            raise ValueError(f"[ERROR] Failed to fetch {url} — status {status}")
+        return r.text
+
+    raise ValueError(f"[ERROR] Failed to fetch {url} after {max_retries} retries.")
+
+# ---------------------------------------------
+# TABLE HELPERS
+# ---------------------------------------------
+def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(-1)
+    return df
+
+def _normalize_team_column(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    cols = list(df.columns)
+    cols_lower = [str(c).strip().lower() for c in cols]
+
+    team_col = None
+    if "team" in cols_lower:
+        team_col = cols[cols_lower.index("team")]
+    elif "tm" in cols_lower:
+        team_col = cols[cols_lower.index("tm")]
+    elif cols and str(cols[0]).startswith("Unnamed"):
+        team_col = cols[0]
+
+    if team_col is None:
+        return df
+
+    if team_col != "Team":
+        df = df.rename(columns={team_col: "Team"})
+    return df
+
+# ---------------------------------------------
+# CURRENT SKATERS / GOALIES
+# ---------------------------------------------
+def get_current_skaters(season_year: int) -> pd.DataFrame:
+    from io import StringIO
+    url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_skaters.html"
+    html = fetch_html(url)
+    tables = pd.read_html(StringIO(html))
+    df = tables[0]
+    df = _flatten_columns(df)
+    df = _normalize_team_column(df)
+    df = df[df["Player"].notna()]
+    df = df[df["Player"] != "Player"]
+    df["Season"] = season_year
+    if "Pos" not in df.columns:
+        df["Pos"] = "NA"
+    return df
+
+def get_current_goalies(season_year: int) -> pd.DataFrame:
+    from io import StringIO
+    url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_goalies.html"
+    html = fetch_html(url)
+    tables = pd.read_html(StringIO(html))
+    df = tables[0]
+    df = _flatten_columns(df)
+    df = _normalize_team_column(df)
+    df = df[df["Player"].notna()]
+    df = df[df["Player"] != "Player"]
+    df["Season"] = season_year
+    df["Pos"] = "G"
+    return df
+
+# ---------------------------------------------
+# CURRENT STANDINGS (FULL NAME → ABBR)
+# ---------------------------------------------
+def get_current_standings(season_year: int) -> pd.DataFrame:
+    from io import StringIO
+    url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_standings.html"
+    html = fetch_html(url)
+    tables = pd.read_html(StringIO(html))
+
+    if not tables:
+        raise ValueError(f"[ERROR] No standings tables found for {season_year}")
+
+    all_rows = []
+
+    for idx, t in enumerate(tables):
+        df = _flatten_columns(t).copy()
+
+        # --- Identify a team column (VERY forgiving) ---
+        team_col = None
+        for c in df.columns:
+            lc = str(c).lower()
+            if lc in ["team", "tm"]:
+                team_col = c
+                break
+        if team_col is None:
+            # Check for unnamed first column (common for HTML <th>)
+            if "Unnamed: 0" in df.columns:
+                team_col = "Unnamed: 0"
+        if team_col is None:
+            continue  # Cannot use this table
+
+        # Rename the team column
+        df = df.rename(columns={team_col: "Team"})
+
+        # Drop rows missing team name
+        df = df[df["Team"].notna()]
+
+        # Drop division headers and junk rows
+        bad = ["division", "conference", "overall", "eastern", "western",
+               "atlantic", "metropolitan", "central", "pacific"]
+        df = df[~df["Team"].astype(str).str.lower().isin(bad)]
+
+        # Map full names → abbreviations
+        def clean_team_name(name):
+            """Normalize team names by removing playoff clinch symbols."""
+            if not isinstance(name, str):
+                return name
+
+            # Remove common symbols: *, x, y, z, †, ‡, +
+            name = re.sub(r"[\*\+xXyYzZ†‡]", "", name)
+
+            # Collapse repeated spaces
+            name = re.sub(r"\s+", " ", name).strip()
+
+            return name
+
+        df["Team"] = df["Team"].astype(str).apply(clean_team_name)
+        df["Team"] = df["Team"].replace(TEAM_NAME_TO_ABBR)
+
+        # Normalize points column
+        pts_col = None
+        for c in df.columns:
+            if str(c).lower() in ["pts", "points"]:
+                pts_col = c
+        if pts_col:
+            df = df.rename(columns={pts_col: "PTS_team"})
+        else:
+            df["PTS_team"] = np.nan
+
+        # Normalize W / L
+        if "W" not in df.columns:
+            df["W"] = np.nan
+        if "L" not in df.columns:
+            df["L"] = np.nan
+
+        # Extract only useful columns
+        df = df[["Team", "PTS_team", "W", "L"]]
+
+        all_rows.append(df)
+
+    if not all_rows:
+        raise ValueError(f"[ERROR] Standings parsing failed for {season_year}")
+
+    standings = pd.concat(all_rows, ignore_index=True)
+
+    # Remove duplicates (many tables repeat teams)
+    standings = standings.drop_duplicates(subset=["Team"], keep="first")
+
+    standings["Season"] = season_year
+
+    print("[DEBUG] Standings teams:", sorted(standings["Team"].unique()))
+
+    return standings
+
+
+# ---------------------------------------------
+# FEATURE ENGINEERING (MATCHES TRAINING)
+# ---------------------------------------------
+def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    if "GP" in df.columns:
+        df = df[df["GP"].fillna(0) >= 20]
+
+    def safe_ratio(num_col, den_col, new_col):
+        if num_col in df.columns and den_col in df.columns:
+            df[new_col] = df[num_col] / df[den_col].replace(0, np.nan)
+        else:
+            df[new_col] = np.nan
+
+    safe_ratio("G", "GP", "G_per_GP")
+    safe_ratio("A", "GP", "A_per_GP")
+    safe_ratio("PTS", "GP", "PTS_per_GP")
+    safe_ratio("SOG", "GP", "SOG_per_GP")
+    safe_ratio("PPG", "GP", "PPG_per_GP")
+    safe_ratio("SHG", "GP", "SHG_per_GP")
+
+    if "Pos" in df.columns:
+        df["is_goalie"] = (df["Pos"] == "G").astype(int)
+    else:
+        df["is_goalie"] = 0
+
+    if {"W", "L"}.issubset(df.columns):
+        df["team_win_pct"] = df["W"] / (df["W"] + df["L"]).replace(0, np.nan)
+    else:
+        df["team_win_pct"] = np.nan
+
+    if "Age" in df.columns:
+        df["Age"] = pd.to_numeric(df["Age"], errors="coerce")
+
+    for col in ["G", "A", "PTS", "PIM", "SOG", "PPG", "SHG"]:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
+
+    return df
+
+# ---------------------------------------------
+# BUILD CURRENT SEASON DF
+# ---------------------------------------------
+def build_current_season_df(season_year: int) -> pd.DataFrame:
+    print(f"[INFO] Building current season {season_year} data...")
+    skaters = get_current_skaters(season_year)
+    goalies = get_current_goalies(season_year)
+    players = pd.concat([skaters, goalies], ignore_index=True, sort=False)
+
+    players = _normalize_team_column(players)
+
+    players["Player"] = players["Player"].apply(fix_name_encoding)
+    players["Player_clean"] = (
+        players["Player"]
+        .str.replace(r"\*", "", regex=True)
+        .str.strip()
+    )
+
+    bad_names = ["league", "lgavg", "average"]
+    players = players[
+        ~players["Player"].str.lower().str.contains("|".join(bad_names), na=False)
+    ]
+
+    standings = get_current_standings(season_year)
+
+    if "Team" in players.columns and "Team" in standings.columns:
+        players = players.merge(
+            standings[["Season", "Team", "PTS_team", "W", "L"]],
+            on=["Season", "Team"],
+            how="left",
+        )
+    else:
+        print(f"[WARN] Skipping standings merge for {season_year} due to missing 'Team' column.")
+        players["PTS_team"] = np.nan
+        players["W"] = np.nan
+        players["L"] = np.nan
+
+    players = engineer_features(players)
+    return players
+
+# ---------------------------------------------
+# PREDICTION
+# ---------------------------------------------
+def predict_current_hart(season_year: int):
+    print(f"[INFO] Loading trained model from: {MODEL_PATH}")
+    model = joblib.load(MODEL_PATH)
+
+    print(f"[INFO] Loading feature metadata from: {FEATURES_PATH}")
+    features_info = json.loads(FEATURES_PATH.read_text())
+    numeric_features = features_info["numeric_features"]
+    categorical_features = features_info["categorical_features"]
+
+    df_current = build_current_season_df(season_year)
+
+    # Ensure all expected features exist
+    for col in numeric_features + categorical_features:
+        if col not in df_current.columns:
+            df_current[col] = np.nan
+
+    X_current = df_current[numeric_features + categorical_features].copy()
+
+    print("[INFO] Generating Hart probabilities...")
+    probs = model.predict_proba(X_current)[:, 1]
+    df_current["Hart_Prob"] = probs
+
+    # Sort candidates
+    if "PTS" in df_current.columns:
+        df_current = df_current.sort_values(
+            ["Hart_Prob", "PTS"], ascending=[False, False]
+        )
+    else:
+        df_current = df_current.sort_values("Hart_Prob", ascending=False)
+
+    # Debug specific players
+    for key in ["Rant", "Bedard","McKinnon","Pastrnak"]:
+        print(f"\n===== DEBUG: {key} =====")
+        print(
+            df_current[df_current["Player"].str.contains(key, case=False)][
+                ["Player", "Team", "Pos", "GP", "G", "A", "PTS", "PTS_team", "Hart_Prob"]
+            ].to_string(index=False)
+        )
+    
+    # Save full CSV
+    output_path = DATA_PROCESSED_DIR / f"nhl_hart_predictions_{season_year}.csv"
+    print(f"[INFO] Saving predictions → {output_path}")
+    df_current.to_csv(output_path, index=False, encoding="utf-8-sig")
+
+    # Safely choose columns to display
+    preferred_cols = [
+        "Player", "Team", "Pos", "GP", "G", "A", "PTS",
+        "PTS_team", "team_win_pct", "is_goalie", "Hart_Prob",
+    ]
+    display_cols = [c for c in preferred_cols if c in df_current.columns]
+
+    print("\n================ TOP 15 HART CANDIDATES ================")
+    print(df_current[display_cols].head(15).to_string(index=False))
+    print("========================================================\n")
+
+# ---------------------------------------------
+# ENTRY POINT
+# ---------------------------------------------
+if __name__ == "__main__":
+    now = datetime.now()
+    # NHL season ends in the year after it starts
+    if now.month >= 7:  # Jul–Dec → season ends next year
+        season_year = now.year + 1
+    else:               # Jan–Jun → season ends this year
+        season_year = now.year
+
+    print(f"[INFO] Running Hart prediction for season ending {season_year}")
+    predict_current_hart(season_year)
+
