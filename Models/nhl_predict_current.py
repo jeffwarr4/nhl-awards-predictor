@@ -724,15 +724,44 @@ def predict_current_hart_v2(season_year: int, top_k_softmax: int = 25):
     df_current["Hart_Win_Prob"] = 0.0
     df_current.loc[df_soft.index, "Hart_Win_Prob"] = softmax
 
+        # -------------------------
+    # Rank players using a composite score
+    #   - Scale vote_share within season
+    #   - Blend vote_share, top5_prob, and win_prob
     # -------------------------
-    # Rank players by vote_share
-    # -------------------------
+
+    # 1) Min-max scale Hart_VoteShare_Pred → [0, 1] for this run
+    vs = df_current["Hart_VoteShare_Pred"].values
+    vs_min = np.nanmin(vs)
+    vs_max = np.nanmax(vs)
+
+    if np.isclose(vs_max, vs_min):
+        # Edge case: all equal → just use zeros so ranking falls back to probs
+        vote_share_scaled = np.zeros_like(vs)
+    else:
+        vote_share_scaled = (vs - vs_min) / (vs_max - vs_min)
+
+    df_current["Hart_VoteShare_Scaled"] = vote_share_scaled
+
+    # 2) Composite final score
+    # You can tweak these weights later if you want:
+    #   - 0.50: strength of MVP case (vote share)
+    #   - 0.40: probability of finishing top 5
+    #   - 0.10: probability of actually winning
+    df_current["Hart_FinalScore"] = (
+        0.50 * df_current["Hart_VoteShare_Scaled"]
+        + 0.40 * df_current["Hart_Top5_Prob"]
+        + 0.10 * df_current["Hart_Win_Prob"]
+    )
+
+    # 3) Rank by composite score (then vote_share + points as soft tie-breakers)
     df_current = df_current.sort_values(
-        ["Hart_VoteShare_Pred", "Hart_Top5_Prob", "PTS"],
+        ["Hart_FinalScore", "Hart_VoteShare_Pred", "PTS"],
         ascending=[False, False, False],
     ).reset_index(drop=True)
 
     df_current["Hart_Rank"] = np.arange(1, len(df_current) + 1)
+
 
     # Save full CSV
     output_path = DATA_PROCESSED_DIR / f"nhl_hart_predictions_v2_{season_year}.csv"
