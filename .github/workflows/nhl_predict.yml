@@ -1,0 +1,49 @@
+name: NHL Awards Predictor - Scheduled Run
+
+on:
+  schedule:
+    # Runs every Tuesday @ 6am Pacific
+    - cron: "0 14 * * TUE"
+  workflow_dispatch: {}
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run current-season predictions
+      run: |
+        python Models/nhl_predict_current.py
+
+    - name: Move flattened outputs to Pages directory
+      run: |
+        mkdir -p pages
+        cp Data/Processed/top5.csv pages/top5.csv
+        cp Data/Processed/top10.csv pages/top10.csv
+        cp Data/Processed/top6to10.csv pages/top6to10.csv
+
+    - name: Commit CSV outputs
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git add pages/*.csv
+        git commit -m "Automated NHL predictions update" || echo "No changes to commit."
+
+    - name: Push to main
+      uses: ad-m/github-push-action@v0.8.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: main
