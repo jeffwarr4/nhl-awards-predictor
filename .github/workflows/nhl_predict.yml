@@ -2,7 +2,7 @@ name: NHL Awards Predictor - Scheduled Run
 
 on:
   schedule:
-    # Runs every Tuesday @ 6am Pacific
+    # Every Tuesday @ 6am Pacific (14:00 UTC)
     - cron: "0 14 * * TUE"
   workflow_dispatch: {}
 
@@ -24,22 +24,61 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run current-season predictions
+    - name: Run current-season predictions (v2)
       run: |
         python Models/nhl_predict_current.py
+
+    - name: Debug: list repo & processed outputs
+      run: |
+        echo "=== Repo root ==="
+        pwd
+        ls -R
+
+        echo "=== Data/Processed contents (if any) ==="
+        if [ -d Data/Processed ]; then
+          ls Data/Processed || echo "Data/Processed exists but is empty"
+        else
+          echo "Data/Processed directory does NOT exist"
+        fi
 
     - name: Move flattened outputs to Pages directory
       run: |
         mkdir -p pages
-        cp Data/Processed/top5.csv pages/top5.csv
-        cp Data/Processed/top10.csv pages/top10.csv
-        cp Data/Processed/top6to10.csv pages/top6to10.csv
+
+        # Latest top5 flat file (e.g. nhl_hart_top5_flat_2026.csv)
+        latest_top5=$(ls -t Data/Processed/nhl_hart_top5_flat_*.csv 2>/dev/null | head -n 1 || echo "")
+        # Latest 6–10 flat file (e.g. nhl_hart_6to10_flat_2026.csv)
+        latest_6to10=$(ls -t Data/Processed/nhl_hart_6to10_flat_*.csv 2>/dev/null | head -n 1 || echo "")
+
+        if [ -n "$latest_top5" ]; then
+          echo "Copying $latest_top5 → pages/top5.csv"
+          cp "$latest_top5" pages/top5.csv
+        else
+          echo "WARNING: No nhl_hart_top5_flat_*.csv found"
+        fi
+
+        if [ -n "$latest_6to10" ]; then
+          echo "Copying $latest_6to10 → pages/top6to10.csv"
+          cp "$latest_6to10" pages/top6to10.csv
+        else
+          echo "WARNING: No nhl_hart_6to10_flat_*.csv found"
+        fi
+
+        # Optional: also publish full v2 predictions as a static CSV
+        latest_full=$(ls -t Data/Processed/nhl_hart_predictions_v2_*.csv 2>/dev/null | head -n 1 || echo "")
+        if [ -n "$latest_full" ]; then
+          echo "Copying $latest_full → pages/nhl_hart_predictions_v2_latest.csv"
+          cp "$latest_full" pages/nhl_hart_predictions_v2_latest.csv
+        else
+          echo "WARNING: No nhl_hart_predictions_v2_*.csv found"
+        fi
 
     - name: Commit CSV outputs
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
-        git add pages/*.csv
+
+        git add pages/*.csv 2>/dev/null || echo "No CSVs to add"
         git commit -m "Automated NHL predictions update" || echo "No changes to commit."
 
     - name: Push to main
