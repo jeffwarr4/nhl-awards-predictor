@@ -247,6 +247,28 @@ def clean_team_name(name):
     name = re.sub(r"\s+", " ", name).strip()
     return name
 
+def parse_toi_to_minutes(value):
+    """
+    Convert 'MM:SS' or 'HH:MM:SS' TOI strings into minutes (float).
+    Returns NaN if unparsable.
+    """
+    import numpy as np
+    if not isinstance(value, str) or ":" not in value:
+        return np.nan
+
+    parts = value.strip().split(":")
+    try:
+        if len(parts) == 2:
+            m, s = parts
+            return int(m) + int(s) / 60.0
+        elif len(parts) == 3:
+            h, m, s = parts
+            return 60 * int(h) + int(m) + int(s) / 60.0
+    except Exception:
+        return np.nan
+
+    return np.nan
+
 
 # ============================================================================
 # SCRAPERS — CURRENT SEASON
@@ -503,6 +525,16 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         df["L_team"] = df["L_team"].fillna(0)
     if "PTS_team" in df.columns:
         df["PTS_team"] = df["PTS_team"].fillna(0)
+
+    # ==================================================
+    # Clean TOI and ATOI into numeric minutes for reporting
+    # ==================================================
+    if "TOI" in df.columns:
+        df["TOI_min"] = df["TOI"].apply(parse_toi_to_minutes)
+
+    if "ATOI" in df.columns:
+        df["ATOI_min"] = df["ATOI"].apply(parse_toi_to_minutes)
+
 
     return df
 

@@ -175,6 +175,27 @@ def _normalize_team_column(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+def parse_toi_to_minutes(value):
+    """
+    Convert 'MM:SS' or 'HH:MM:SS' TOI strings into minutes (float).
+    Returns NaN if unparsable.
+    """
+    import numpy as np
+    if not isinstance(value, str) or ":" not in value:
+        return np.nan
+
+    parts = value.strip().split(":")
+    try:
+        if len(parts) == 2:
+            m, s = parts
+            return int(m) + int(s) / 60.0
+        elif len(parts) == 3:
+            h, m, s = parts
+            return 60 * int(h) + int(m) + int(s) / 60.0
+    except Exception:
+        return np.nan
+
+    return np.nan
 
 # ---------------------------------------------
 # GET SKATERS DATA
