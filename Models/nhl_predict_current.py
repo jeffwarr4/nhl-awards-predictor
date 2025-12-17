@@ -666,15 +666,10 @@ def export_flat_block(
         row[prefix + "team"] = block.loc[i, "Team"] if "Team" in block.columns else ""
         row[prefix + "pos"] = block.loc[i, "Pos"] if "Pos" in block.columns else ""
         row[prefix + "gp"] = float(block.loc[i, "GP"]) if "GP" in block.columns else np.nan
-        row[prefix + "g"] = float(block.loc[i, "G"]) if "G" in block.columns else np.nan
-        row[prefix + "a"] = float(block.loc[i, "A"]) if "A" in block.columns else np.nan
         row[prefix + "pts"] = float(block.loc[i, "PTS"]) if "PTS" in block.columns else np.nan
 
-        row[prefix + "pts_team"] = float(block.loc[i, "PTS_team"]) if "PTS_team" in block.columns else np.nan
         row[prefix + "team_win_pct"] = float(block.loc[i, "team_win_pct"]) if "team_win_pct" in block.columns else np.nan
 
-        row[prefix + "vote_share_pred"] = float(block.loc[i, "Hart_VoteShare_Pred"]) if "Hart_VoteShare_Pred" in block.columns else np.nan
-        row[prefix + "top5_prob"] = float(block.loc[i, "Hart_Top5_Prob"]) if "Hart_Top5_Prob" in block.columns else np.nan
         row[prefix + "win_prob"] = float(block.loc[i, "Hart_Win_Prob"]) if "Hart_Win_Prob" in block.columns else np.nan
 
     new_row_df = pd.DataFrame([row])
