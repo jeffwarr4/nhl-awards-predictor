@@ -519,7 +519,12 @@ def build_historical_training_data():
             players["PTS_team"] = pd.NA
             players["W"] = pd.NA
             players["L"] = pd.NA
+        # 🔹 Clean TOI / ATOI into numeric minutes for reporting
+            if "TOI" in players.columns:
+                players["TOI_min"] = players["TOI"].apply(parse_toi_to_minutes)
 
+            if "ATOI" in players.columns:
+                players["ATOI_min"] = players["ATOI"].apply(parse_toi_to_minutes)
 
         all_seasons.append(players)
 
