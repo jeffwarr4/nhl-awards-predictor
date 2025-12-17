@@ -670,7 +670,19 @@ def export_flat_block(
 
         row[prefix + "team_win_pct"] = float(block.loc[i, "team_win_pct"]) if "team_win_pct" in block.columns else np.nan
 
-        row[prefix + "win_prob"] = float(block.loc[i, "Hart_Win_Prob"]) if "Hart_Win_Prob" in block.columns else np.nan
+        # 🔹 Rate stat (added back)
+        row[prefix + "ppg"] = (
+            float(block.loc[i, "PTS_per_GP"])
+            if "PTS_per_GP" in block.columns
+            else np.nan
+        )
+
+        # 🔹 Primary model stat for IG
+        row[prefix + "top5_prob"] = (
+            float(block.loc[i, "Hart_Top5_Prob"])
+            if "Hart_Top5_Prob" in block.columns
+            else np.nan
+        )
 
     new_row_df = pd.DataFrame([row])
 
