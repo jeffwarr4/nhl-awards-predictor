@@ -3,7 +3,7 @@ name: NHL Awards Predictor - Scheduled Run
 on:
   schedule:
     # Every Tuesday @ 6am Pacific (14:00 UTC)
-    - cron: "0 14 * * TUE"
+    - cron: "0 14 * * WED"
   workflow_dispatch:
 
 jobs:
@@ -85,4 +85,5 @@ jobs:
         uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
           branch: main
