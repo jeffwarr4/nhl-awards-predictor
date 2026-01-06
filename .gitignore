@@ -30,3 +30,6 @@ Data/Processed/*.csv
 *.log
 
 echo Assets/>> .gitignore
+
+Assests/
+
