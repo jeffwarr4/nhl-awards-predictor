@@ -19,7 +19,7 @@ import json
 import re
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -27,6 +27,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import requests
+
 
 # ============================================================================
 # CONFIG
@@ -714,6 +715,8 @@ def predict_current_hart_v2(season_year: int, top_k_softmax: int = 25):
       - Hart_Top5_Prob       (probability of being a top-5 finisher)
       - Hart_Win_Prob        (softmax over top_k_softmax candidates)
     """
+        # 🔹 Model run timestamp (UTC, ISO 8601)
+    model_run_ts = datetime.now(timezone.utc).isoformat()
 
     print(f"[INFO][v2] Loading regression model from: {MODEL_REG_V2_PATH}")
     reg_model = joblib.load(MODEL_REG_V2_PATH)
@@ -723,6 +726,11 @@ def predict_current_hart_v2(season_year: int, top_k_softmax: int = 25):
 
     print(f"[INFO][v2] Building current season dataset for {season_year}...")
     df_current = build_current_season_df(season_year)
+
+    # 🔹 Add model run timestamp to every row
+    df_current["model_run_ts"] = model_run_ts
+
+    df_current["model_run_label"] = datetime.now().strftime("As of %m/%d/%Y")
 
     print("[DEBUG] Any McDavid rows?", df_current["Player"].str.contains("McDavid", case=False, na=False).any())
     print(df_current[df_current["Player"].str.contains("McDavid", case=False, na=False)][
