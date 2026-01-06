@@ -28,3 +28,5 @@ Data/Processed/*.csv
 
 # Logs
 *.log
+
+echo Assets/>> .gitignore
