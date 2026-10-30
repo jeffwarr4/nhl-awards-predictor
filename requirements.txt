@@ -1,6 +1,7 @@
 pandas
 numpy
-scikit-learn
+# Pinned: Models/Artifacts/*.pkl are pickled sklearn pipelines; load with the version that trained them.
+scikit-learn==1.7.2
 joblib
 requests
 beautifulsoup4

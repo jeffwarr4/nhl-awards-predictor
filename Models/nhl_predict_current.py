@@ -1,141 +1,61 @@
 """
 nhl_predict_current.py
 
-Builds a current-season NHL player dataset, loads the trained Hart model,
-and produces Hart Trophy probabilities for all players, plus a top-15
-leaderboard and a CSV in Data/Processed.
+Scores the live NHL season with the v2 Hart models and writes:
+  Data/Processed/nhl_hart_predictions_v2_{season}.csv   (full board; the workflow copies
+                                                         it to pages/ for the Google Sheet)
+  Data/Processed/nhl_hart_top5_flat_{season}.csv        (one row per run, ranks 1–5)
+  Data/Processed/nhl_hart_6to10_flat_{season}.csv       (ranks 6–10)
 
-Assumptions:
-- Model + features from nhl_train.py are saved in:
-    Models/Artifacts/hart_model.pkl
-    Models/Artifacts/hart_features.json
-- Project structure:
-    /Data/Processed
-    /Models/Artifacts
-    /Models/nhl_predict_current.py
+Pipeline
+1. Hockey-Reference skaters + goalies, one row per player (hart_common: traded
+   players keep their season-total row under their current team; goalies come
+   from the goalies page only).
+2. Team record from the standings → team_gp, team_win_pct, team_pts_pct.
+3. Eligibility: played ≥ MIN_TEAM_GAME_SHARE of his team's games (works from
+   the first week; the old GP >= 20 gate emptied the board until late November).
+4. Counting features projected to an 82-game pace before scoring — the models
+   were trained on full seasons. Displayed stats stay the actual season-to-date values.
+5. hart_common.hart_scores → Hart_FinalScore → Hart_Rank.
+
+Run:
+    python Models/nhl_predict_current.py
 """
 
-import json
-import re
 import time
-import unicodedata
 from datetime import datetime, timezone
 from io import StringIO
-from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
 import requests
 
+from hart_common import (
+    add_team_context, collapse_multi_team, engineer_features, feature_frame, fix_name_encoding,
+    hart_scores, parse_standings, project_to_pace, team_abbr,
+)
+from config import (
+    DATA_PROCESSED, MIN_TEAM_GAME_SHARE, MODEL_REG_PATH, MODEL_TOP5_PATH, SEASON_END_YEAR,
+)
 
-# ============================================================================
-# CONFIG
-# ============================================================================
+DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
+DATA_PROCESSED_DIR = DATA_PROCESSED
 
-# Season *ending* year. For the 2025–26 season, Hockey-Reference uses 2026.
-SEASON_END_YEAR = 2026  # adjust as needed in future
+# Columns of nhl_hart_predictions_v2_{season}.csv, in order. The workflow copies it
+# to pages/nhl_hart_predictions_v2_latest.csv, which the website's Google Sheet
+# IMPORTDATAs — a contract: don't add, drop or reorder without switching the Sheet.
+PAGES_COLUMNS = [
+    "Rk", "Player", "Age", "Team", "Pos", "GP", "G", "A", "PTS", "+/-", "PIM", "EVG", "PPG", "SHG",
+    "GWG", "EV", "PP", "SH", "SOG", "SPCT", "TSA", "TOI", "ATOI", "FOW", "FOL", "FO%", "BLK", "HIT",
+    "TAKE", "GIVE", "Awards", "GS", "W", "L", "T/O", "GA", "Shots", "SV", "SV%", "GAA", "SO", "MIN",
+    "QS", "QS%", "RBS", "GA%-", "GSAA", "GAA/A", "GPS", "Season", "Player_clean", "PTS_team",
+    "W_team", "L_team", "is_goalie", "team_win_pct", "G_per_GP", "A_per_GP", "PTS_per_GP",
+    "SOG_per_GP", "PPG_per_GP", "SHG_per_GP", "TOI_min", "ATOI_min", "model_run_ts",
+    "model_run_label", "Hart_VoteShare_Pred", "Hart_Top5_Prob", "Hart_Win_Prob",
+    "Hart_VoteShare_Scaled", "Hart_FinalScore", "Hart_Rank",
+]
 
-# Project-relative paths
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_PROCESSED_DIR = PROJECT_ROOT / "Data" / "Processed"
-DATA_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-
-ARTIFACTS_DIR = PROJECT_ROOT / "Models" / "Artifacts"
-MODEL_PATH = ARTIFACTS_DIR / "hart_model.pkl"
-FEATURES_PATH = ARTIFACTS_DIR / "hart_features.json"
-
-MODEL_REG_V2_PATH = ARTIFACTS_DIR / "hart_vote_reg_v2.pkl"
-MODEL_TOP5_V2_PATH = ARTIFACTS_DIR / "hart_top5_clf_v2.pkl"
-FEATURES_V2_PATH = ARTIFACTS_DIR / "hart_features_v2.json"
-
-# ============================================================================
-# TEAM NAME NORMALIZATION
-# ============================================================================
-
-TEAM_NAME_TO_ABBR = {
-    # Standard names
-    "Anaheim Ducks": "ANA",
-    "Arizona Coyotes": "ARI",
-    "Boston Bruins": "BOS",
-    "Buffalo Sabres": "BUF",
-    "Calgary Flames": "CGY",
-    "Carolina Hurricanes": "CAR",
-    "Chicago Blackhawks": "CHI",
-    "Colorado Avalanche": "COL",
-    "Columbus Blue Jackets": "CBJ",
-    "Dallas Stars": "DAL",
-    "Detroit Red Wings": "DET",
-    "Edmonton Oilers": "EDM",
-    "Florida Panthers": "FLA",
-    "Los Angeles Kings": "LAK",
-    "Minnesota Wild": "MIN",
-    "Montreal Canadiens": "MTL",
-    "Nashville Predators": "NSH",
-    "New Jersey Devils": "NJD",
-    "New York Islanders": "NYI",
-    "New York Rangers": "NYR",
-    "Ottawa Senators": "OTT",
-    "Philadelphia Flyers": "PHI",
-    "Pittsburgh Penguins": "PIT",
-    "San Jose Sharks": "SJS",
-    "Seattle Kraken": "SEA",
-    "St. Louis Blues": "STL",
-    "Tampa Bay Lightning": "TBL",
-    "Toronto Maple Leafs": "TOR",
-    "Vancouver Canucks": "VAN",
-    "Vegas Golden Knights": "VEG",  # Hockey-Reference uses VEG
-    "Washington Capitals": "WSH",
-    "Winnipeg Jets": "WPG",
-    "Utah Mammoth": "UTA",
-    "Utah Hockey Club": "UTA",
-
-    # Weird truncated / typo variants seen on H-R
-    "Calgar Flames": "CGY",
-    "New Jerse Devils": "NJD",
-    "New ork Islanders": "NYI",
-    "New ork Rangers": "NYR",
-    "Philadelphia Flers": "PHI",
-    "Tampa Ba Lightning": "TBL",
-    "Utah Hocke Club": "UTA",
-    "NR": "NYR",  # truncated New York Rangers
-
-    # Abbreviations as "names"
-    "ANA": "ANA",
-    "ARI": "ARI",
-    "BOS": "BOS",
-    "BUF": "BUF",
-    "CGY": "CGY",
-    "CAR": "CAR",
-    "CHI": "CHI",
-    "COL": "COL",
-    "CBJ": "CBJ",
-    "DAL": "DAL",
-    "DET": "DET",
-    "EDM": "EDM",
-    "FLA": "FLA",
-    "LAK": "LAK",
-    "MIN": "MIN",
-    "MTL": "MTL",
-    "NSH": "NSH",
-    "NJD": "NJD",
-    "NYI": "NYI",
-    "NYR": "NYR",
-    "OTT": "OTT",
-    "PHI": "PHI",
-    "PIT": "PIT",
-    "SJS": "SJS",
-    "SEA": "SEA",
-    "STL": "STL",
-    "TBL": "TBL",
-    "TOR": "TOR",
-    "VAN": "VAN",
-    "VEG": "VEG",
-    "VGK": "VEG",
-    "WSH": "WSH",
-    "WPG": "WPG",
-    "UTA": "UTA",
-}
 
 # ============================================================================
 # HELPERS
@@ -226,34 +146,11 @@ def _normalize_team_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def fix_name_encoding(text):
-    """
-    Match the historical pipeline's name-fix behavior:
-    - Reverse the common Hockey-Reference UTF-8/Latin-1 decoding issue.
-    """
-    if not isinstance(text, str):
-        return text
-    try:
-        # Many corrupted names are UTF-8 decoded as Latin-1; this reverses that.
-        return text.encode("latin1").decode("utf8")
-    except Exception:
-        return text
-
-
-def clean_team_name(name):
-    """Normalize team names by stripping clinch markers and fixing spacing."""
-    if not isinstance(name, str):
-        return name
-    name = re.sub(r"[\*\+xXyYzZ†‡]", "", name)
-    name = re.sub(r"\s+", " ", name).strip()
-    return name
-
 def parse_toi_to_minutes(value):
     """
     Convert 'MM:SS' or 'HH:MM:SS' TOI strings into minutes (float).
     Returns NaN if unparsable.
     """
-    import numpy as np
     if not isinstance(value, str) or ":" not in value:
         return np.nan
 
@@ -276,34 +173,31 @@ def parse_toi_to_minutes(value):
 # ============================================================================
 
 
+def _clean_player_table(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop header/league-average rows, fix names, map teams, one row per player."""
+    df = _normalize_team_column(df)
+    df = df[df["Player"].notna() & (df["Player"].astype(str).str.strip().str.lower() != "player")]
+    df = df[~df["Player"].astype(str).str.lower().str.contains("league|lgavg|average")]
+    df["Player"] = (
+        df["Player"].apply(fix_name_encoding).astype(str).str.replace("*", "", regex=False).str.strip()
+    )
+    df["Team"] = df["Team"].map(team_abbr)
+    return collapse_multi_team(df)
+
+
 def get_current_skaters(season_year: int) -> pd.DataFrame:
     """
-    Fetch current-season skater stats from Hockey-Reference for the given
-    season end year (e.g., 2026 for the 2025–26 season).
-
-    Returns a cleaned DataFrame with at least:
-      Player, Team, Pos, GP, G, A, PTS, SOG, PPG, SHG, etc.
+    Current-season skater stats from Hockey-Reference (season end year, e.g. 2027
+    for 2026–27). Goalies are dropped here; their row comes from the goalies page.
     """
     url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_skaters.html"
-    html = fetch_html(url)
-    tables = pd.read_html(StringIO(html))
-
-    if not tables:
-        raise ValueError(f"[ERROR] No tables found on skaters page for {season_year}")
+    tables = pd.read_html(StringIO(fetch_html(url)))
 
     chosen = None
     for idx, t in enumerate(tables):
-        df = flatten_columns(t)
-        df = dedupe_columns(df)
-
-        cols_lower = [str(c).strip().lower() for c in df.columns]
-        has_player = "player" in cols_lower
-        has_team = "team" in cols_lower or "tm" in cols_lower
-        has_pts = "pts" in cols_lower
-        has_g = "g" in cols_lower
-        has_a = "a" in cols_lower
-
-        if has_player and has_team and has_pts and has_g and has_a:
+        df = dedupe_columns(flatten_columns(t))
+        cols_lower = {str(c).strip().lower() for c in df.columns}
+        if {"player", "pts", "g", "a"} <= cols_lower and cols_lower & {"team", "tm"}:
             print(f"[DEBUG] Skater table candidate {idx} for {season_year}: {list(df.columns)}")
             chosen = df
             break
@@ -313,231 +207,40 @@ def get_current_skaters(season_year: int) -> pd.DataFrame:
             f"[ERROR] Could not find a skater stats table with Player/G/A/PTS for {season_year}"
         )
 
-    df = chosen.copy()
-    df = _normalize_team_column(df)
-
-    if "Player" in df.columns:
-        df = df[df["Player"].notna()].copy()
-        df = df[df["Player"].astype(str).str.strip().str.lower() != "player"]
-        df["Player"] = (
-            df["Player"]
-            .astype(str)
-            .str.replace(r"\*", "", regex=True)
-            .str.strip()
-            .apply(fix_name_encoding)
-        )
-
+    df = _clean_player_table(chosen.copy())
     if "Pos" not in df.columns:
         df["Pos"] = ""
-
-    return df
+    return df[df["Pos"] != "G"].copy()
 
 
 def get_current_goalies(season_year: int) -> pd.DataFrame:
     """Fetch current-season goalie stats from Hockey-Reference."""
     url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_goalies.html"
-
-    html = fetch_html(url)
-    tables = pd.read_html(StringIO(html))
+    tables = pd.read_html(StringIO(fetch_html(url)))
     if not tables:
         raise ValueError(f"[ERROR] No goalie tables found for {season_year}")
 
-    df = tables[0]
-    df = flatten_columns(df)
-    df = dedupe_columns(df)
-    df = _normalize_team_column(df)
-
+    df = dedupe_columns(flatten_columns(tables[0]))
     if "Player" not in df.columns:
         raise ValueError(f"[ERROR] Goalie table missing 'Player' column for {season_year}")
 
-    df = df[df["Player"].notna()]
-    df = df[df["Player"] != "Player"]
-
-    bad_names = ["league", "lgavg", "average"]
-    df = df[
-        ~df["Player"]
-        .astype(str)
-        .str.lower()
-        .str.contains("|".join(bad_names), na=False)
-    ]
-
-    df["Season"] = season_year
+    df = _clean_player_table(df)
     df["Pos"] = "G"
-
-    df["Player"] = df["Player"].apply(fix_name_encoding)
-    df["Player_clean"] = (
-        df["Player"].astype(str).str.replace(r"\*", "", regex=True).str.strip()
-    )
-
     return df
 
 
 def get_current_standings(season_year: int) -> pd.DataFrame:
-    """
-    Best-effort fetch of current-season team standings.
-
-    Returns columns: Team, PTS, W, L, OL (if available)
-    """
+    """Team record (team_gp, W_team, L_team, OL_team, PTS_team) by abbreviation.
+    Raises if the page can't be read: without team games played there is no
+    eligibility or pace, and a board built without them must not be published."""
     url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_standings.html"
     print(f"[INFO] Fetching current standings from: {url}")
+    st = parse_standings(pd.read_html(StringIO(fetch_html(url))))
+    unmapped = [t for t in st["Team"] if len(str(t)) != 3]
+    if st.empty or unmapped:
+        raise ValueError(f"[ERROR] Unusable standings for {season_year} (unmapped: {unmapped})")
+    return st
 
-    try:
-        html = fetch_html(url)
-        tables = pd.read_html(StringIO(html))
-    except Exception as e:
-        print(f"[WARN] Failed to download or parse standings page: {e}")
-        return pd.DataFrame(columns=["Team", "PTS", "W", "L", "OL"])
-
-    if not tables:
-        print(f"[WARN] No tables found on standings page for {season_year}")
-        return pd.DataFrame(columns=["Team", "PTS", "W", "L", "OL"])
-
-    candidates = []
-    for idx, t in enumerate(tables):
-        df = flatten_columns(t)
-        df = dedupe_columns(df)
-        df = _normalize_team_column(df)
-
-        cols_lower = [str(c).strip().lower() for c in df.columns]
-        has_team = "team" in cols_lower
-        has_pts = any("pts" == cl or "points" in cl for cl in cols_lower)
-
-        if not (has_team and has_pts):
-            continue
-
-        print(f"[DEBUG] Standings candidate table {idx} for {season_year}: {list(df.columns)}")
-
-        # Identify columns
-        team_col = "Team"
-        pts_col = next(
-            (c for c in df.columns if str(c).strip().lower() in ("pts", "points")), None
-        )
-        w_col = next((c for c in df.columns if str(c).strip().lower() == "w"), None)
-        l_col = next((c for c in df.columns if str(c).strip().lower() == "l"), None)
-        ol_col = next(
-            (c for c in df.columns if str(c).strip().lower() in ("ol", "otl")),
-            None,
-        )
-
-        if pts_col is None:
-            continue
-
-        keep_map = {"Team": team_col, "PTS": pts_col}
-        if w_col is not None:
-            keep_map["W"] = w_col
-        if l_col is not None:
-            keep_map["L"] = l_col
-        if ol_col is not None:
-            keep_map["OL"] = ol_col
-
-        sub = df[list(keep_map.values())].copy()
-        sub.columns = list(keep_map.keys())
-        candidates.append(sub)
-
-    if not candidates:
-        print(
-            f"[WARN] Could not find any usable standings tables for {season_year}. "
-            f"PTS_team and team_win_pct will be NaN."
-        )
-        return pd.DataFrame(columns=["Team", "PTS", "W", "L", "OL"])
-
-    standings = pd.concat(candidates, ignore_index=True)
-
-    standings = standings[standings["Team"].notna()].copy()
-    standings = standings.drop_duplicates(subset=["Team"], keep="first")
-
-    for col in ["PTS", "W", "L", "OL"]:
-        if col in standings.columns:
-            standings[col] = pd.to_numeric(standings[col], errors="coerce")
-
-    return standings
-
-# ============================================================================
-# FEATURE ENGINEERING (MATCHES TRAINING LOGIC)
-# ============================================================================
-
-
-def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Mirror nhl_train.engineer_features for current-season data.
-
-    - Filter GP >= 20
-    - Compute per-game rates (G/A/PTS/SOG/PPG/SHG)
-    - Compute team_win_pct
-    - Ensure is_goalie flag
-    - Fill obvious NaNs
-    """
-    df = df.copy()
-    df = df.loc[:, ~df.columns.duplicated()]
-
-    # Filter by GP >= 20 (same as training)
-    if "GP" in df.columns:
-        df = df[df["GP"].fillna(0) >= 20].copy()
-
-    # Ensure is_goalie exists
-    if "is_goalie" not in df.columns:
-        if "Pos" in df.columns:
-            df["is_goalie"] = (df["Pos"] == "G").astype(int)
-        else:
-            df["is_goalie"] = 0
-
-    # Ensure PTS (player points) exists
-    if "PTS" not in df.columns and {"G", "A"}.issubset(df.columns):
-        df["PTS"] = df["G"].fillna(0) + df["A"].fillna(0)
-
-    # Compute team_win_pct
-    # Prefer W_team/L_team (from standings), fallback to W/L if that's all we have
-    if {"W_team", "L_team"}.issubset(df.columns):
-        denom = (df["W_team"] + df["L_team"]).replace(0, np.nan)
-        df["team_win_pct"] = df["W_team"] / denom
-    elif {"W", "L"}.issubset(df.columns):
-        denom = (df["W"] + df["L"]).replace(0, np.nan)
-        df["team_win_pct"] = df["W"] / denom
-    else:
-        df["team_win_pct"] = np.nan
-
-    # Per-game ratios (same as training)
-    def safe_ratio(num_col, den_col, new_col):
-        if num_col in df.columns and den_col in df.columns:
-            df[new_col] = df[num_col] / df[den_col].replace(0, np.nan)
-        else:
-            df[new_col] = np.nan
-
-    safe_ratio("G", "GP", "G_per_GP")
-    safe_ratio("A", "GP", "A_per_GP")
-    safe_ratio("PTS", "GP", "PTS_per_GP")
-    safe_ratio("SOG", "GP", "SOG_per_GP")
-    safe_ratio("PPG", "GP", "PPG_per_GP")
-    safe_ratio("SHG", "GP", "SHG_per_GP")
-
-    # Age numeric
-    if "Age" in df.columns:
-        df["Age"] = pd.to_numeric(df["Age"], errors="coerce")
-
-    # Fill obvious NaNs with 0 for stats that are naturally 0 if missing
-    for col in ["G", "A", "PTS", "PIM", "SOG", "PPG", "SHG"]:
-        if col in df.columns:
-            df[col] = df[col].fillna(0)
-
-    # Team W/L analogues for NaN filling (training used W, L)
-    if "W_team" in df.columns:
-        df["W_team"] = df["W_team"].fillna(0)
-    if "L_team" in df.columns:
-        df["L_team"] = df["L_team"].fillna(0)
-    if "PTS_team" in df.columns:
-        df["PTS_team"] = df["PTS_team"].fillna(0)
-
-    # ==================================================
-    # Clean TOI and ATOI into numeric minutes for reporting
-    # ==================================================
-    if "TOI" in df.columns:
-        df["TOI_min"] = df["TOI"].apply(parse_toi_to_minutes)
-
-    if "ATOI" in df.columns:
-        df["ATOI_min"] = df["ATOI"].apply(parse_toi_to_minutes)
-
-
-    return df
 
 # ============================================================================
 # BUILD FULL CURRENT-SEASON DATAFRAME
@@ -545,75 +248,33 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_current_season_df(season_year: int) -> pd.DataFrame:
+    """All eligible players with actual season-to-date stats and engineered features."""
     print(f"[INFO] Building current season dataset for {season_year}...")
 
-    TEAM_FIX_MAP = {
-        "Calgar Flames": "CGY",
-        "New Jerse Devils": "NJD",
-        "New ork Islanders": "NYI",
-        "New ork Rangers": "NYR",
-        "Philadelphia Flers": "PHI",
-        "Tampa Ba Lightning": "TBL",
-        "Utah Hocke Club": "UTA",
-        "Utah Mammoth": "UTA",
-    }
-
-    def normalize_team_abbrev(team: str) -> str:
-        if not isinstance(team, str):
-            return team
-        t = team.strip()
-        # First handle weird raw strings
-        if t in TEAM_FIX_MAP:
-            return TEAM_FIX_MAP[t]
-        # Then map full names/known variants to abbreviations
-        if t in TEAM_NAME_TO_ABBR:
-            return TEAM_NAME_TO_ABBR[t]
-        return t
-
-    # Fetch player stats
-    skaters = get_current_skaters(season_year).reset_index(drop=True)
-    goalies = get_current_goalies(season_year).reset_index(drop=True)
-
-    skaters = skaters.loc[:, ~skaters.columns.duplicated()].copy()
-    goalies = goalies.loc[:, ~goalies.columns.duplicated()].copy()
-
+    skaters = get_current_skaters(season_year)
+    goalies = get_current_goalies(season_year)
     players = pd.concat([skaters, goalies], ignore_index=True, sort=False)
+    players["Season"] = season_year
+    players["Player_clean"] = players["Player"]
 
-    # Normalize player team abbreviations
-    players["Team"] = players["Team"].apply(normalize_team_abbrev)
-
-    # Fetch standings
-    standings = get_current_standings(season_year).copy()
-    if not standings.empty:
-        standings["Team"] = standings["Team"].apply(clean_team_name).apply(normalize_team_abbrev)
-
-        # Rename standings columns to avoid collision with goalie W/L
-        standings = standings.rename(
-            columns={
-                "PTS": "PTS_team",
-                "W": "W_team",
-                "L": "L_team",
-            }
-        )
-
-        merge_cols = ["Team"]
-        for col in ["PTS_team", "W_team", "L_team"]:
-            if col in standings.columns:
-                merge_cols.append(col)
-
-        players = players.merge(
-            standings[merge_cols],
-            how="left",
-            on="Team",
-        )
-
-    print("==== DEBUG: PLAYERS COLUMNS BEFORE FEATURE ENGINEERING ====")
-    print(players.columns.tolist())
-
-    # Feature engineering to match training logic
+    players = add_team_context(players, get_current_standings(season_year))
     players = engineer_features(players)
 
-    return players
+    if "TOI" in players.columns:
+        players["TOI_min"] = players["TOI"].apply(parse_toi_to_minutes)
+    if "ATOI" in players.columns:
+        players["ATOI_min"] = players["ATOI"].apply(parse_toi_to_minutes)
+
+    no_team = players["team_gp"].isna()
+    if no_team.any():
+        print(f"[WARN] {int(no_team.sum())} player(s) without a team record dropped: "
+              f"{players.loc[no_team, ['Player', 'Team']].head(10).values.tolist()}")
+    players = players[~no_team & (players["team_gp"] > 0)]
+    eligible = players["GP"] / players["team_gp"] >= MIN_TEAM_GAME_SHARE
+    print(f"[INFO] {int(eligible.sum())} of {len(players)} players eligible "
+          f"(GP >= {MIN_TEAM_GAME_SHARE:.0%} of team games)")
+    return players[eligible].reset_index(drop=True)
+
 
 def export_flat_block(
     df_current: pd.DataFrame,
@@ -640,11 +301,6 @@ def export_flat_block(
 
     # Ensure sorted by Hart_Rank
     df_sorted = df_current.sort_values("Hart_Rank", ascending=True).reset_index(drop=True)
-
-    # Slice the requested rank window
-    # Convert ranks (1-based) to 0-based indices
-    start_idx = start_rank - 1
-    end_idx = end_rank - 1
 
     block = df_sorted[(df_sorted["Hart_Rank"] >= start_rank) &
                       (df_sorted["Hart_Rank"] <= end_rank)].copy()
@@ -714,129 +370,46 @@ def predict_current_hart_v2(season_year: int, top_k_softmax: int = 25):
       - Hart_VoteShare_Pred  (continuous score ~ expected vote share)
       - Hart_Top5_Prob       (probability of being a top-5 finisher)
       - Hart_Win_Prob        (softmax over top_k_softmax candidates)
+    Both models score pace-projected features; every displayed stat is actual.
     """
-        # 🔹 Model run timestamp (UTC, ISO 8601)
-    model_run_ts = datetime.now(timezone.utc).isoformat()
+    reg_model = joblib.load(MODEL_REG_PATH)
+    clf_model = joblib.load(MODEL_TOP5_PATH)
 
-    print(f"[INFO][v2] Loading regression model from: {MODEL_REG_V2_PATH}")
-    reg_model = joblib.load(MODEL_REG_V2_PATH)
-
-    print(f"[INFO][v2] Loading top-5 classifier from: {MODEL_TOP5_V2_PATH}")
-    clf_model = joblib.load(MODEL_TOP5_V2_PATH)
-
-    print(f"[INFO][v2] Building current season dataset for {season_year}...")
     df_current = build_current_season_df(season_year)
+    if df_current.empty:
+        # Fail loudly — never overwrite the last good board with an empty one.
+        raise SystemExit(f"ERROR: no eligible players for {season_year}; nothing written.")
 
-    # 🔹 Add model run timestamp to every row
-    df_current["model_run_ts"] = model_run_ts
-
+    df_current["model_run_ts"] = datetime.now(timezone.utc).isoformat()
     df_current["model_run_label"] = datetime.now().strftime("As of %m/%d/%Y")
 
-    print("[DEBUG] Any McDavid rows?", df_current["Player"].str.contains("McDavid", case=False, na=False).any())
-    print(df_current[df_current["Player"].str.contains("McDavid", case=False, na=False)][
-    ["Player", "Team", "GP", "G", "A", "PTS", "Hart_VoteShare_Pred", "Hart_Top5_Prob"]
-] if "Hart_VoteShare_Pred" in df_current.columns else "McDavid not in current DF (probably filtered by GP)")
-
-
-    # The pipelines know which columns to use (they have the ColumnTransformer inside),
-    # so we can just pass the full dataframe; extra columns are ignored.
-    X_current = df_current.copy()
-
-    print("[INFO][v2] Predicting vote_share (continuous Hart-ness)...")
-    vote_share_pred = reg_model.predict(X_current)
-
-    print("[INFO][v2] Predicting top-5 probabilities...")
-    top5_prob = clf_model.predict_proba(X_current)[:, 1]
+    X = feature_frame(project_to_pace(df_current))
+    vote_share_pred = reg_model.predict(X)
+    top5_prob = clf_model.predict_proba(X)[:, 1]
+    scores = hart_scores(vote_share_pred, top5_prob, top_k_softmax)
 
     df_current["Hart_VoteShare_Pred"] = vote_share_pred
     df_current["Hart_Top5_Prob"] = top5_prob
+    df_current["Hart_Win_Prob"] = scores["win_prob"]
+    df_current["Hart_VoteShare_Scaled"] = scores["vote_share_scaled"]
+    df_current["Hart_FinalScore"] = scores["final"]
 
-    # -------------------------
-    # Derive winner probability via softmax on vote_share_pred
-    # -------------------------
-    # Restrict to top_k_softmax players when computing the softmax,
-    # then assign zero to everyone else. This keeps the winner probability
-    # focused on realistic contenders.
-    df_soft = df_current.sort_values(
-        "Hart_VoteShare_Pred", ascending=False
-    ).head(top_k_softmax)
-
-    scores = df_soft["Hart_VoteShare_Pred"].values
-    # Guard against all zeros / negative scores
-    shifted = scores - scores.max()
-    exps = np.exp(shifted)
-    softmax = exps / exps.sum()
-
-    # Initialize column
-    df_current["Hart_Win_Prob"] = 0.0
-    df_current.loc[df_soft.index, "Hart_Win_Prob"] = softmax
-
-        # -------------------------
-    # Rank players using a composite score
-    #   - Scale vote_share within season
-    #   - Blend vote_share, top5_prob, and win_prob
-    # -------------------------
-
-    # 1) Min-max scale Hart_VoteShare_Pred → [0, 1] for this run
-    vs = df_current["Hart_VoteShare_Pred"].values
-    vs_min = np.nanmin(vs)
-    vs_max = np.nanmax(vs)
-
-    if np.isclose(vs_max, vs_min):
-        # Edge case: all equal → just use zeros so ranking falls back to probs
-        vote_share_scaled = np.zeros_like(vs)
-    else:
-        vote_share_scaled = (vs - vs_min) / (vs_max - vs_min)
-
-    df_current["Hart_VoteShare_Scaled"] = vote_share_scaled
-
-    # 2) Composite final score
-    # You can tweak these weights later if you want:
-    #   - 0.50: strength of MVP case (vote share)
-    #   - 0.40: probability of finishing top 5
-    #   - 0.10: probability of actually winning
-    df_current["Hart_FinalScore"] = (
-        0.50 * df_current["Hart_VoteShare_Scaled"]
-        + 0.40 * df_current["Hart_Top5_Prob"]
-        + 0.10 * df_current["Hart_Win_Prob"]
-    )
-
-    # 3) Rank by composite score (then vote_share + points as soft tie-breakers)
+    # Rank by composite score (then vote_share + points as soft tie-breakers)
     df_current = df_current.sort_values(
         ["Hart_FinalScore", "Hart_VoteShare_Pred", "PTS"],
         ascending=[False, False, False],
     ).reset_index(drop=True)
-
     df_current["Hart_Rank"] = np.arange(1, len(df_current) + 1)
 
-
-    # Save full CSV
     output_path = DATA_PROCESSED_DIR / f"nhl_hart_predictions_v2_{season_year}.csv"
     print(f"[INFO][v2] Saving v2 predictions → {output_path}")
-    df_current.to_csv(output_path, index=False, encoding="utf-8-sig")
+    df_current.reindex(columns=PAGES_COLUMNS).to_csv(output_path, index=False, encoding="utf-8-sig")
 
-    # ⭐ NEW: export flattened blocks for 1–5 and 6–10
     export_flat_block(df_current, season_year, start_rank=1, end_rank=5, label="top5")
     export_flat_block(df_current, season_year, start_rank=6, end_rank=10, label="6to10")
 
-    # Columns to display
-    preferred_cols = [
-        "Hart_Rank",
-        "Player",
-        "Team",
-        "Pos",
-        "GP",
-        "G",
-        "A",
-        "PTS",
-        "PTS_team",
-        "team_win_pct",
-        "Hart_VoteShare_Pred",
-        "Hart_Top5_Prob",
-        "Hart_Win_Prob",
-    ]
-    display_cols = [c for c in preferred_cols if c in df_current.columns]
-
+    display_cols = ["Hart_Rank", "Player", "Team", "Pos", "GP", "team_gp", "G", "A", "PTS",
+                    "team_pts_pct", "Hart_VoteShare_Pred", "Hart_Top5_Prob"]
     print("\n=========== TOP 15 HART CANDIDATES (v2) ===========")
     print(df_current[display_cols].head(15).to_string(index=False))
     print("===================================================\n")
@@ -851,5 +424,3 @@ def predict_current_hart_v2(season_year: int, top_k_softmax: int = 25):
 if __name__ == "__main__":
     print(f"[INFO] Running Hart v2 prediction for season ending {SEASON_END_YEAR}")
     predict_current_hart_v2(SEASON_END_YEAR)
-
-

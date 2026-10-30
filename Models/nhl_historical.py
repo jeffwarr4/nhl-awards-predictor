@@ -1,76 +1,31 @@
+"""
+nhl_historical.py
+
+Builds Data/Raw/nhl_historical_training.csv: one row per player-season
+(TRAIN_START..TRAIN_END) with Hockey-Reference stats, team record and Hart
+voting labels (VotePoints, vote_share, vote_rank, is_winner, is_top5).
+
+Player rows go through hart_common, the same cleaning nhl_predict_current.py
+uses, so training and live features line up.
+"""
+
 import time
 from io import StringIO
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 
-# ---------------------------------------------
-# CONFIG
-# ---------------------------------------------
-# You can narrow this while testing, e.g. 2008–2010, then expand to 2024.
-START_SEASON = 2008   # inclusive
-END_SEASON = 2025     # inclusive
+from hart_common import (
+    add_team_context, collapse_multi_team, fix_name_encoding, parse_standings, team_abbr,
+)
+from config import DATA_RAW, TRAIN_END, TRAIN_START, TRAINING_CSV
 
-TEAM_NAME_TO_ABBR = {
-    "Anaheim Ducks": "ANA",
-    "Arizona Coyotes": "ARI",
-    "Boston Bruins": "BOS",
-    "Buffalo Sabres": "BUF",
-    "Calgary Flames": "CGY",
-    "Carolina Hurricanes": "CAR",
-    "Chicago Blackhawks": "CHI",
-    "Colorado Avalanche": "COL",
-    "Columbus Blue Jackets": "CBJ",
-    "Dallas Stars": "DAL",
-    "Detroit Red Wings": "DET",
-    "Edmonton Oilers": "EDM",
-    "Florida Panthers": "FLA",
-    "Los Angeles Kings": "LAK",
-    "Minnesota Wild": "MIN",
-    "Montreal Canadiens": "MTL",
-    "Nashville Predators": "NSH",
-    "New Jersey Devils": "NJD",
-    "New York Islanders": "NYI",
-    "New York Rangers": "NYR",
-    "Ottawa Senators": "OTT",
-    "Philadelphia Flyers": "PHI",
-    "Pittsburgh Penguins": "PIT",
-    "San Jose Sharks": "SJS",
-    "Seattle Kraken": "SEA",
-    "St. Louis Blues": "STL",
-    "Tampa Bay Lightning": "TBL",
-    "Toronto Maple Leafs": "TOR",
-    "Vancouver Canucks": "VAN",
-    "Vegas Golden Knights": "VEG",  # matches your skater table output
-    "Washington Capitals": "WSH",
-    "Winnipeg Jets": "WPG",
-}
+START_SEASON = TRAIN_START   # inclusive
+END_SEASON = TRAIN_END       # inclusive
 
-
-# ---------------------------------------------
-# PATH SETUP (always relative to project root)
-# ---------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_RAW_DIR = PROJECT_ROOT / "Data" / "Raw"
-DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
-
-OUTPUT_FILE = DATA_RAW_DIR / "nhl_historical_training.csv"
-
-
-# ---------------------------------------------
-# FIX BAD TEXT ENCODING (Hockey-Reference UTF8/LATIN1 bug)
-# ---------------------------------------------
-def fix_name_encoding(text):
-    if not isinstance(text, str):
-        return text
-    try:
-        # Many corrupted names are UTF-8 decoded as Latin-1; this reverses that.
-        return text.encode("latin1").decode("utf8")
-    except Exception:
-        return text
+DATA_RAW.mkdir(parents=True, exist_ok=True)
+OUTPUT_FILE = TRAINING_CSV
 
 
 # ---------------------------------------------
@@ -139,7 +94,7 @@ def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
             cleaned = [str(c).strip() for c in col
                        if c and not str(c).startswith("Unnamed")]
             if cleaned:
-                flat.append(cleaned[-1])   # <--- key change: use last, not first
+                flat.append(cleaned[-1])
             else:
                 flat.append(str(col[-1]).strip())
         else:
@@ -175,12 +130,12 @@ def _normalize_team_column(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 def parse_toi_to_minutes(value):
     """
     Convert 'MM:SS' or 'HH:MM:SS' TOI strings into minutes (float).
     Returns NaN if unparsable.
     """
-    import numpy as np
     if not isinstance(value, str) or ":" not in value:
         return np.nan
 
@@ -197,42 +152,42 @@ def parse_toi_to_minutes(value):
 
     return np.nan
 
+
+def _player_table(url: str, season_year: int, kind: str) -> pd.DataFrame:
+    """First table on a skaters/goalies page, cleaned to one row per player."""
+    tables = pd.read_html(StringIO(fetch_html(url)))
+    if not tables:
+        raise ValueError(f"[ERROR] No {kind} tables found for {season_year}")
+
+    df = _flatten_columns(tables[0])
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+    df = _normalize_team_column(df)
+    print(f"[DEBUG] {kind.title()} columns for {season_year}: {list(df.columns)}")
+
+    if "Player" not in df.columns:
+        raise ValueError(
+            f"[ERROR] {kind.title()} table for {season_year} has no 'Player' column. "
+            f"Columns: {list(df.columns)}"
+        )
+
+    # Drop repeated header rows and league-average rows inside the table
+    df = df[df["Player"].notna() & (df["Player"] != "Player")]
+    df = df[~df["Player"].astype(str).str.lower().str.contains("league|lgavg|average")]
+    df["Player"] = df["Player"].apply(fix_name_encoding).astype(str).str.replace("*", "", regex=False).str.strip()
+    df["Team"] = df["Team"].map(team_abbr)
+    return collapse_multi_team(df)
+
+
 # ---------------------------------------------
 # GET SKATERS DATA
 # ---------------------------------------------
 def get_season_skaters(season_year: int) -> pd.DataFrame:
     url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_skaters.html"
-    html = fetch_html(url)
-
-    tables = pd.read_html(StringIO(html))
-    if not tables:
-        raise ValueError(f"[ERROR] No skater tables found for {season_year}")
-
-    tables = pd.read_html(html)
-    df = tables[0]
-    df = _flatten_columns(df)
-    # NEW: drop duplicate columns
-    df = df.loc[:, ~df.columns.duplicated()].copy()
-
-    print(f"[DEBUG] Skater columns for {season_year}: {list(df.columns)}")
-
-    if "Player" not in df.columns:
-        raise ValueError(
-            f"[ERROR] Skater table for {season_year} has no 'Player' column. "
-            f"Columns: {list(df.columns)}"
-        )
-
-    # Drop repeated header rows inside the table
-    df = df[df["Player"] != "Player"]
-    df = df[df["Player"].notna()]
-
-    df["Season"] = season_year
-
-    # Ensure position is present
+    df = _player_table(url, season_year, "skater")
     if "Pos" not in df.columns:
         df["Pos"] = "NA"
-
-    return df
+    # The skaters page also lists goalies (TOI, points, no W/SV%); their row comes from the goalies page
+    return df[df["Pos"] != "G"].copy()
 
 
 # ---------------------------------------------
@@ -240,31 +195,8 @@ def get_season_skaters(season_year: int) -> pd.DataFrame:
 # ---------------------------------------------
 def get_season_goalies(season_year: int) -> pd.DataFrame:
     url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_goalies.html"
-    html = fetch_html(url)
-
-    tables = pd.read_html(StringIO(html))
-    if not tables:
-        raise ValueError(f"[ERROR] No goalie tables found for {season_year}")
-
-    tables = pd.read_html(html)
-    df = tables[0]
-    df = _flatten_columns(df)
-    df = df.loc[:, ~df.columns.duplicated()].copy()
-
-    print(f"[DEBUG] Goalie columns for {season_year}: {list(df.columns)}")
-
-    if "Player" not in df.columns:
-        raise ValueError(
-            f"[ERROR] Goalie table for {season_year} has no 'Player' column. "
-            f"Columns: {list(df.columns)}"
-        )
-
-    df = df[df["Player"] != "Player"]
-    df = df[df["Player"].notna()]
-
-    df["Season"] = season_year
+    df = _player_table(url, season_year, "goalie")
     df["Pos"] = "G"
-
     return df
 
 
@@ -272,75 +204,21 @@ def get_season_goalies(season_year: int) -> pd.DataFrame:
 # GET STANDINGS
 # ---------------------------------------------
 def get_season_standings(season_year: int) -> pd.DataFrame:
+    """Team record (team_gp, W_team, L_team, OL_team, PTS_team) by team abbreviation.
+    Playoff teams are marked '*' on Hockey-Reference; parse_standings strips it
+    (an earlier version didn't, so every playoff team lost its record)."""
     url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_standings.html"
-    html = fetch_html(url)
-
-    tables = pd.read_html(StringIO(html))
-    if not tables:
-        raise ValueError(f"[ERROR] No standings tables found for {season_year}")
-
-    candidates = []
-    for idx, t in enumerate(tables):
-        t = _flatten_columns(t)
-        # drop duplicate columns
-        t = t.loc[:, ~t.columns.duplicated()].copy()
-        t = _normalize_team_column(t)
-
-        cols = [str(c).strip().lower() for c in t.columns]
-
-
-        # Require at least Team, W, L, PTS
-        has_team = "team" in cols
-        has_w = "w" in cols
-        has_l = "l" in cols
-        has_pts = "pts" in cols
-
-        if has_team and has_w and has_l and has_pts:
-            print(f"[DEBUG] Standings candidate table {idx} for {season_year}: {list(t.columns)}")
-            candidates.append(t)
-
-    if not candidates:
-        print(
-            f"[DEBUG] No usable standings tables found for {season_year}. "
-            f"First table columns: {list(tables[0].columns)}"
-        )
-        raise ValueError(f"[ERROR] Standings table missing required columns for {season_year}")
-
-    df = pd.concat(candidates, ignore_index=True)
-
-    # Drop rows that are clearly not teams (like division headers or totals)
-    df = df[df["Team"].notna()]
-    df = df[~df["Team"].isin(["Division", "Conference", "League", "Overall"])]
-
-    # Drop duplicate teams, keep first
-    df = df.drop_duplicates(subset=["Team"], keep="first")
-
-    # 🔹 Map full team names to abbreviations so they match skater/goalie tables
-    df["Team"] = (
-        df["Team"]
-        .astype(str)
-        .str.strip()
-        .replace(TEAM_NAME_TO_ABBR)
-    )
-
-    # 🔹 Rename team points so it doesn't collide with player PTS
-    if "PTS" in df.columns:
-        df = df.rename(columns={"PTS": "PTS_team"})
-
-    keep_cols = [c for c in ["Team", "PTS", "W", "L"] if c in df.columns]
-    df = df[keep_cols].copy()
-
-    
-    df["Season"] = season_year
-    return df
-
+    st = parse_standings(pd.read_html(StringIO(fetch_html(url))))
+    unmapped = [t for t in st["Team"] if len(str(t)) != 3]
+    if unmapped:
+        raise ValueError(f"[ERROR] Unmapped standings teams for {season_year}: {unmapped}")
+    print(f"[DEBUG] Standings for {season_year}: {len(st)} teams")
+    return st
 
 
 # ---------------------------------------------
 # GET HART VOTING (MVP)
 # ---------------------------------------------
-from io import StringIO
-
 def get_season_hart_voting(season_year: int) -> pd.DataFrame:
     """
     Fetch Hart Trophy voting for a given season and return a tidy dataframe with:
@@ -432,9 +310,44 @@ def get_season_hart_voting(season_year: int) -> pd.DataFrame:
     # Return only what the training pipeline expects
     return voting_df[["Season", "Player_clean", "VotePoints", "VoteTeam"]].copy()
 
+
 # ---------------------------------------------
 # BUILD FULL TRAINING SET
 # ---------------------------------------------
+def build_season(season: int) -> pd.DataFrame:
+    skaters = get_season_skaters(season)
+    goalies = get_season_goalies(season)
+    players = pd.concat([skaters, goalies], ignore_index=True, sort=False)
+    players["Season"] = season
+    players["Player_clean"] = players["Player"]
+    players["is_goalie"] = players["Pos"].eq("G").astype(int)
+
+    players = add_team_context(players, get_season_standings(season))
+
+    # Hart voting by name. If two players share a name that season (two Sebastian
+    # Ahos in 2019), the votes stay only with the one on the ballot team, else
+    # the higher scorer.
+    voting = get_season_hart_voting(season)
+    players = players.merge(voting[["Player_clean", "VotePoints", "VoteTeam"]],
+                            on="Player_clean", how="left")
+    dup = players["VotePoints"].notna() & players.duplicated("Player_clean", keep=False)
+    if dup.any():
+        same_team = players["Team"].eq(players["VoteTeam"])
+        pick = (players[dup].assign(_m=same_team[dup], _p=pd.to_numeric(players.loc[dup, "PTS"], errors="coerce"))
+                .sort_values(["_m", "_p"], ascending=False).drop_duplicates("Player_clean").index)
+        players.loc[dup & ~players.index.isin(pick), ["VotePoints", "VoteTeam"]] = np.nan
+
+    if "TOI" in players.columns:
+        players["TOI_min"] = players["TOI"].apply(parse_toi_to_minutes)
+    if "ATOI" in players.columns:
+        players["ATOI_min"] = players["ATOI"].apply(parse_toi_to_minutes)
+
+    missing = players.loc[players["VotePoints"].gt(0) & players["team_gp"].isna(), "Player"].tolist()
+    if missing:
+        print(f"[WARN] {season}: vote-getters without a team record: {missing}")
+    return players
+
+
 def build_historical_training_data():
     all_seasons = []
 
@@ -442,124 +355,28 @@ def build_historical_training_data():
         print("=" * 50)
         print(f"[INFO] Building season {season}")
         print("=" * 50)
-
-        # Players: skaters + goalies
-        skaters = get_season_skaters(season)
-        goalies = get_season_goalies(season)
-
-        skaters = skaters.loc[:, ~skaters.columns.duplicated()].copy()
-        goalies = goalies.loc[:, ~goalies.columns.duplicated()].copy()
-
-        players = pd.concat([skaters, goalies], ignore_index=True, sort=False)
-        players["Season"] = season
-
-        # Normalize team column & clean player names
-        players = _normalize_team_column(players)
-
-        players["Player"] = players["Player"].apply(fix_name_encoding)
-        players["Player_clean"] = (
-            players["Player"]
-            .str.replace(r"\*", "", regex=True)
-            .str.strip()
-        )
-
-        # Flag goalies
-        players["is_goalie"] = players["Pos"].eq("G").astype(int)
-
-        # Standings
-        standings = get_season_standings(season)
-
-        # Hart voting
-        voting = get_season_hart_voting(season)
-
-        # Merge voting into players by Player + Season
-        players = players.merge(
-            voting[["Season", "Player_clean", "VotePoints", "VoteTeam"]],
-            on=["Season", "Player_clean"],
-            how="left",
-        )
-
-        # --- Remove 'League Average' or bogus rows ---
-        bad_names = ["league", "lgavg", "average"]
-        players = players[
-            ~players["Player"].str.lower().str.contains("|".join(bad_names), na=False)
-        ]
-
-        # Drop non-player rows
-        players = players[players["Player"].notna()]
-        players = players[players["Player"].str.strip() != ""]
-
-
-
-        # --- Handle players who played for multiple teams (2TM scenario) ---
-        # Multi-team per player/season?
-        multi_team = players.groupby(["Season", "Player_clean"])["Team"].transform("nunique") > 1
-        has_2tm = players["Team"].eq("2TM")
-
-        # If player has multiple teams and a 2TM row, keep only the 2TM row
-        keep_mask = ~multi_team | (multi_team & has_2tm)
-        players = players[keep_mask].copy()
-
-        # For 2TM rows with a Hart ballot team, use that as their team
-        mask_2tm_with_vote = players["Team"].eq("2TM") & players["VoteTeam"].notna()
-        players.loc[mask_2tm_with_vote, "Team"] = players.loc[mask_2tm_with_vote, "VoteTeam"]
-
-        # Merge team standings into players by Team + Season
-        if "Team" in players.columns and "Team" in standings.columns:
-            # Use PTS_team (renamed in get_season_standings) instead of PTS
-            standings_cols = [c for c in ["Season", "Team", "PTS_team", "W", "L"] if c in standings.columns]
-            players = players.merge(
-                standings[standings_cols],
-                on=["Season", "Team"],
-                how="left",
-                suffixes=("", "_team"),
-            )
-        else:
-            print(f"[WARN] Skipping standings merge for {season} due to missing 'Team' column.")
-            players["PTS_team"] = pd.NA
-            players["W"] = pd.NA
-            players["L"] = pd.NA
-        # 🔹 Clean TOI / ATOI into numeric minutes for reporting
-            if "TOI" in players.columns:
-                players["TOI_min"] = players["TOI"].apply(parse_toi_to_minutes)
-
-            if "ATOI" in players.columns:
-                players["ATOI_min"] = players["ATOI"].apply(parse_toi_to_minutes)
-
-        all_seasons.append(players)
+        all_seasons.append(build_season(season))
 
         # Season-level throttle to avoid being blocked
         print(f"[INFO] Completed season {season}. Sleeping 10 seconds before next season...")
         time.sleep(10)
 
-        full_df = pd.concat(all_seasons, ignore_index=True)
+    full_df = pd.concat(all_seasons, ignore_index=True)
 
     # ============================================================
     # Add Hart voting labels: vote_rank, vote_share, is_winner, is_top5
     # ============================================================
 
-    # Ensure VotePoints exists and is numeric
-    if "VotePoints" not in full_df.columns:
-        full_df["VotePoints"] = 0
     full_df["VotePoints"] = pd.to_numeric(full_df["VotePoints"], errors="coerce").fillna(0)
 
-    # Total Hart points per season (for vote_share)
-    season_totals = full_df.groupby("Season")["VotePoints"].transform("sum")
-
     # vote_share: player's share of all Hart points that season
-    full_df["vote_share"] = np.where(
-        season_totals > 0,
-        full_df["VotePoints"] / season_totals,
-        0.0,
-    )
+    season_totals = full_df.groupby("Season")["VotePoints"].transform("sum")
+    full_df["vote_share"] = np.where(season_totals > 0, full_df["VotePoints"] / season_totals, 0.0)
 
     # vote_rank: rank among players WITH > 0 vote points in that season
     # (others get NaN and will NOT be treated as top5/winner)
     full_df["vote_rank"] = np.nan
-
-    # Only rank players who actually received at least one vote
     has_votes = full_df["VotePoints"] > 0
-
     full_df.loc[has_votes, "vote_rank"] = (
         full_df[has_votes]
         .sort_values(["Season", "VotePoints"], ascending=[True, False])
@@ -567,18 +384,12 @@ def build_historical_training_data():
         .rank(method="first", ascending=False)
     )
 
-    # Binary labels
-    full_df["is_winner"] = ((full_df["vote_rank"] == 1).astype(int))
-    full_df["is_top5"] = ((full_df["vote_rank"] >= 1) & (full_df["vote_rank"] <= 5)).astype(int)
-
-    # Any seasons where nobody had VotePoints > 0 => all zeros for winner/top5
-    full_df["is_winner"] = full_df["is_winner"].fillna(0).astype(int)
-    full_df["is_top5"] = full_df["is_top5"].fillna(0).astype(int)
+    full_df["is_winner"] = (full_df["vote_rank"] == 1).astype(int)
+    full_df["is_top5"] = full_df["vote_rank"].between(1, 5).astype(int)
 
     print(f"[INFO] Saving final dataset → {OUTPUT_FILE}")
     full_df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8-sig")
     print("[DONE] Historical NHL dataset created successfully.")
-
 
 
 # ---------------------------------------------

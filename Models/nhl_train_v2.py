@@ -1,331 +1,177 @@
-import json
-from pathlib import Path
+"""
+nhl_train_v2.py
 
+Trains the two Hart models on Data/Raw/nhl_historical_training.csv:
+  - GradientBoostingRegressor on vote_share  → Models/Artifacts/hart_vote_reg_v2.pkl
+  - LogisticRegression on is_top5             → Models/Artifacts/hart_top5_clf_v2.pkl
+
+Evaluation is leave-one-season-out: for each season, fit on every other season,
+score it, and report where the actual winner and top 5 landed on the blended
+board (hart_common.hart_scores). Seasons are never split randomly. The shipped
+models are then fit on ALL seasons TRAIN_START..TRAIN_END.
+
+Run:
+    python Models/nhl_train_v2.py                 # backtest + fit + save
+    python Models/nhl_train_v2.py --no-backtest   # fit + save only
+"""
+
+import argparse
+import json
+
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
-
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    roc_auc_score,
-    average_precision_score,
-    r2_score,
-    mean_absolute_error,
+
+from hart_common import engineer_features, feature_frame, hart_scores
+from config import (
+    ARTIFACTS_DIR, BACKTEST_CSV, CATEGORICAL_FEATURES, FEATURES_PATH, MIN_GP_TRAIN,
+    MODEL_REG_PATH, MODEL_TOP5_PATH, NUMERIC_FEATURES, ROOT_DIR, TRAIN_END, TRAIN_START, TRAINING_CSV,
 )
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import GradientBoostingRegressor
 
-# ---------------------------------------------
-# PATHS
-# ---------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_RAW = PROJECT_ROOT / "Data" / "Raw" / "nhl_historical_training.csv"
-ARTIFACTS_DIR = PROJECT_ROOT / "Models" / "Artifacts"
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
-
-MODEL_REG_PATH = ARTIFACTS_DIR / "hart_vote_reg_v2.pkl"
-MODEL_TOP5_PATH = ARTIFACTS_DIR / "hart_top5_clf_v2.pkl"
-FEATURES_PATH = ARTIFACTS_DIR / "hart_features_v2.json"
 
 
 # ---------------------------------------------
 # LOAD DATA
 # ---------------------------------------------
-def load_historical() -> pd.DataFrame:
-    df = pd.read_csv(DATA_RAW)
-
-    # Normalize column names
+def load_training() -> pd.DataFrame:
+    df = pd.read_csv(TRAINING_CSV, low_memory=False)
     df.columns = [c.strip() for c in df.columns]
 
-    # Ensure Season is int
-    if "Season" in df.columns:
-        df["Season"] = pd.to_numeric(df["Season"], errors="coerce").astype("Int64")
-
-    # Ensure vote-related columns exist
-    for col in ["VotePoints", "vote_share", "vote_rank", "is_winner", "is_top5"]:
+    for col in ["VotePoints", "vote_share", "vote_rank", "is_winner", "is_top5", "team_pts_pct"]:
         if col not in df.columns:
-            raise ValueError(
-                f"Expected column '{col}' not found in historical data. "
-                "Did you run the updated nhl_historical.py?"
-            )
+            raise ValueError(f"Expected column '{col}' not in {TRAINING_CSV.name}. "
+                             "Re-run Models/nhl_historical.py.")
 
-    # Coerce types
-    df["VotePoints"] = pd.to_numeric(df["VotePoints"], errors="coerce").fillna(0)
+    df["Season"] = pd.to_numeric(df["Season"], errors="coerce").astype(int)
+    df = df[df["Season"].between(TRAIN_START, TRAIN_END)]
+    df = engineer_features(df)
+    df = df[df["GP"].fillna(0) >= MIN_GP_TRAIN].copy()
+
     df["vote_share"] = pd.to_numeric(df["vote_share"], errors="coerce").fillna(0)
-    df["is_winner"] = pd.to_numeric(df["is_winner"], errors="coerce").fillna(0).astype(int)
     df["is_top5"] = pd.to_numeric(df["is_top5"], errors="coerce").fillna(0).astype(int)
 
-    return df
+    # Only seasons that actually have a vote
+    voted = df.groupby("Season")["vote_share"].sum()
+    return df[df["Season"].isin(voted[voted > 0].index)].reset_index(drop=True)
 
 
 # ---------------------------------------------
-# FEATURE ENGINEERING (aligned with predict_current)
+# MODELS
 # ---------------------------------------------
-def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+def make_models() -> tuple[Pipeline, Pipeline]:
+    def preprocessor():
+        return ColumnTransformer([
+            ("num", Pipeline([("imputer", SimpleImputer(strategy="median")),
+                              ("scaler", StandardScaler())]), NUMERIC_FEATURES),
+            ("cat", Pipeline([("imputer", SimpleImputer(strategy="most_frequent")),
+                              ("encoder", OneHotEncoder(handle_unknown="ignore"))]), CATEGORICAL_FEATURES),
+        ], remainder="drop")
 
-    # Filter out very low GP seasons
-    if "GP" in df.columns:
-        df = df[df["GP"].fillna(0) >= 20].copy()
+    reg = Pipeline([("preprocessor", preprocessor()),
+                    ("regressor", GradientBoostingRegressor(random_state=42, n_estimators=300,
+                                                            learning_rate=0.05, max_depth=3))])
+    clf = Pipeline([("preprocessor", preprocessor()),
+                    ("clf", LogisticRegression(max_iter=1000, class_weight="balanced"))])
+    return reg, clf
 
-    # Helper: safe ratio
-    def safe_ratio(num_col, den_col, new_col):
-        if num_col in df.columns and den_col in df.columns:
-            denom = df[den_col].replace(0, np.nan)
-            df[new_col] = df[num_col] / denom
-        else:
-            df[new_col] = np.nan
 
-    # Base per-game stats
-    safe_ratio("G", "GP", "G_per_GP")
-    safe_ratio("A", "GP", "A_per_GP")
-    safe_ratio("PTS", "GP", "PTS_per_GP")
-    safe_ratio("SOG", "GP", "SOG_per_GP")
-    safe_ratio("PPG", "GP", "PPG_per_GP")
-    safe_ratio("SHG", "GP", "SHG_per_GP")
-
-    # Team context: team_win_pct
-    # Historical set usually has W and L from standings merge
-    if {"W", "L"}.issubset(df.columns):
-        games = (df["W"].fillna(0) + df["L"].fillna(0)).replace(0, np.nan)
-        df["team_win_pct"] = df["W"] / games
-    elif "team_win_pct" not in df.columns:
-        df["team_win_pct"] = np.nan
-
-    # Make sure PTS_team exists (even if NaN)
-    if "PTS_team" not in df.columns:
-        df["PTS_team"] = np.nan
-
-    # Age numeric
-    if "Age" in df.columns:
-        df["Age"] = pd.to_numeric(df["Age"], errors="coerce")
-
-    # Goalie flag
-    if "is_goalie" not in df.columns:
-        if "Pos" in df.columns:
-            df["is_goalie"] = (df["Pos"] == "G").astype(int)
-        else:
-            df["is_goalie"] = 0
-
-    # Fill basic counting stats NaNs with 0 where it makes sense
-    for col in ["G", "A", "PTS", "SOG", "PPG", "SHG", "W", "L"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    return df
+def fit(df: pd.DataFrame) -> tuple[Pipeline, Pipeline]:
+    reg, clf = make_models()
+    X = feature_frame(df)
+    reg.fit(X, df["vote_share"])
+    clf.fit(X, df["is_top5"])
+    return reg, clf
 
 
 # ---------------------------------------------
-# BUILD X, y FOR REGRESSION + CLASSIFICATION
+# LEAVE-ONE-SEASON-OUT BACKTEST
 # ---------------------------------------------
-def build_xy(df: pd.DataFrame):
-    df = df.copy()
+def backtest(df: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for season in sorted(df["Season"].unique()):
+        train, test = df[df["Season"] != season], df[df["Season"] == season].copy()
+        reg, clf = fit(train)
+        X = feature_frame(test)
+        test["score"] = hart_scores(reg.predict(X), clf.predict_proba(X)[:, 1])["final"]
+        test = test.sort_values("score", ascending=False).reset_index(drop=True)
+        test["model_rank"] = test.index + 1
 
-    # Numeric features: smaller, stronger set
-    numeric_candidates = [
-        "Age",
-        "GP",
-        "G",
-        "A",
-        "PTS",
-        "G_per_GP",
-        "A_per_GP",
-        "PTS_per_GP",
-        "SOG_per_GP",
-        "PPG",
-        "PPG_per_GP",
-        "team_win_pct",
-        "PTS_team",
-        "is_goalie",
-    ]
-    numeric_features = [c for c in numeric_candidates if c in df.columns]
-
-    # Categorical features: keep only position
-    cat_candidates = ["Pos"]
-    categorical_features = [c for c in cat_candidates if c in df.columns]
-
-    # Targets
-    if "vote_share" not in df.columns or "is_top5" not in df.columns:
-        raise ValueError("Expected 'vote_share' and 'is_top5' in dataframe.")
-
-    # Drop rows missing vote_share (shouldn't be many)
-    df = df[df["vote_share"].notna()].copy()
-
-    X = df[numeric_features + categorical_features].copy()
-    y_reg = df["vote_share"].astype(float)
-    y_top5 = df["is_top5"].astype(int)
-
-    return X, y_reg, y_top5, numeric_features, categorical_features, df
+        real = test[test["vote_share"] > 0].sort_values("vote_share", ascending=False)
+        top5 = real.head(5)
+        winner = real.iloc[0]
+        rows.append({
+            "season": int(season),
+            "winner": winner["Player"],
+            "winner_rank": int(winner["model_rank"]),
+            "top5_in_top5": int((top5["model_rank"] <= 5).sum()),
+            "top5_in_top10": int((top5["model_rank"] <= 10).sum()),
+            "model_top3": ", ".join(test.head(3)["Player"]),
+        })
+        print(f"  {season}: winner {winner['Player']} ranked #{rows[-1]['winner_rank']}")
+    return pd.DataFrame(rows)
 
 
-# ---------------------------------------------
-# TRAIN MODELS
-# ---------------------------------------------
-def train_models():
-    print(f"[INFO] Loading historical data from: {DATA_RAW}")
-    df = load_historical()
-    print(f"[INFO] Loaded {len(df):,} rows before feature engineering")
-
-    df = engineer_features(df)
-    print(f"[INFO] {len(df):,} rows after GP filter & feature engineering")
-
-    # Restrict to seasons that actually have voting data (just in case)
-    seasons_with_votes = df.groupby("Season")["VotePoints"].sum()
-    good_seasons = seasons_with_votes[seasons_with_votes > 0].index.tolist()
-    df = df[df["Season"].isin(good_seasons)].copy()
-
-    X, y_reg, y_top5, numeric_features, categorical_features, df_xy = build_xy(df)
-
-    print(f"[INFO] Using {len(numeric_features)} numeric features and "
-          f"{len(categorical_features)} categorical features")
-    print("[DEBUG] Numeric features:", numeric_features)
-    print("[DEBUG] Categorical features:", categorical_features)
-
-    # Train/test split by season to avoid leakage
-    seasons = sorted(df_xy["Season"].dropna().unique())
-    if len(seasons) > 3:
-        test_seasons = seasons[-3:]
-    else:
-        test_seasons = seasons[-1:]
-
-    train_mask = ~df_xy["Season"].isin(test_seasons)
-    test_mask = df_xy["Season"].isin(test_seasons)
-
-    X_train, X_test = X[train_mask], X[test_mask]
-    y_reg_train, y_reg_test = y_reg[train_mask], y_reg[test_mask]
-    y_top5_train, y_top5_test = y_top5[train_mask], y_top5[test_mask]
-
-    print(f"[INFO] Training on {len(X_train):,} rows from seasons "
-          f"{sorted(df_xy['Season'][train_mask].dropna().unique())}")
-    print(f"[INFO] Testing  on {len(X_test):,} rows from seasons {sorted(test_seasons)}")
-
-    # Preprocessing: impute missing, scale numeric, one-hot encode categorical
-    numeric_transformer = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", StandardScaler()),
-    ])
-
-    categorical_transformer = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("encoder", OneHotEncoder(handle_unknown="ignore")),
-    ])
-
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("num", numeric_transformer, numeric_features),
-            ("cat", categorical_transformer, categorical_features),
-        ],
-        remainder="drop",
-    )
-
-    # --------------------------
-    # Model A: Regression on vote_share
-    # --------------------------
-    regressor = GradientBoostingRegressor(
-        random_state=42,
-        n_estimators=300,
-        learning_rate=0.05,
-        max_depth=3,
-    )
-
-    reg_model = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            ("regressor", regressor),
-        ]
-    )
-
-    print("[INFO] Fitting regression model (vote_share)...")
-    reg_model.fit(X_train, y_reg_train)
-
-    y_reg_train_pred = reg_model.predict(X_train)
-    y_reg_test_pred = reg_model.predict(X_test)
-
-    reg_train_r2 = r2_score(y_reg_train, y_reg_train_pred)
-    reg_test_r2 = r2_score(y_reg_test, y_reg_test_pred)
-    reg_train_mae = mean_absolute_error(y_reg_train, y_reg_train_pred)
-    reg_test_mae = mean_absolute_error(y_reg_test, y_reg_test_pred)
-
-    print(f"[METRIC][REG] Train R2:  {reg_train_r2:.3f}")
-    print(f"[METRIC][REG] Test  R2:  {reg_test_r2:.3f}")
-    print(f"[METRIC][REG] Train MAE: {reg_train_mae:.4f}")
-    print(f"[METRIC][REG] Test  MAE: {reg_test_mae:.4f}")
-
-    # --------------------------
-    # Model B: Classification on is_top5
-    # --------------------------
-    clf = LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced",
-    )
-
-    clf_model = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            ("clf", clf),
-        ]
-    )
-
-    print("[INFO] Fitting classification model (is_top5)...")
-    clf_model.fit(X_train, y_top5_train)
-
-    y_clf_train_prob = clf_model.predict_proba(X_train)[:, 1]
-    y_clf_test_prob = clf_model.predict_proba(X_test)[:, 1]
-
-    try:
-        clf_train_auc = roc_auc_score(y_top5_train, y_clf_train_prob)
-        clf_test_auc = roc_auc_score(y_top5_test, y_clf_test_prob)
-        clf_train_ap = average_precision_score(y_top5_train, y_clf_train_prob)
-        clf_test_ap = average_precision_score(y_top5_test, y_clf_test_prob)
-    except ValueError:
-        clf_train_auc = np.nan
-        clf_test_auc = np.nan
-        clf_train_ap = np.nan
-        clf_test_ap = np.nan
-
-    print(f"[METRIC][TOP5] Train ROC-AUC: {clf_train_auc:.3f}")
-    print(f"[METRIC][TOP5] Test  ROC-AUC: {clf_test_auc:.3f}")
-    print(f"[METRIC][TOP5] Train AP:      {clf_train_ap:.3f}")
-    print(f"[METRIC][TOP5] Test  AP:      {clf_test_ap:.3f}")
-
-    # --------------------------
-    # Save artifacts
-    # --------------------------
-    print(f"[INFO] Saving regression model to: {MODEL_REG_PATH}")
-    joblib.dump(reg_model, MODEL_REG_PATH)
-
-    print(f"[INFO] Saving top5 classifier model to: {MODEL_TOP5_PATH}")
-    joblib.dump(clf_model, MODEL_TOP5_PATH)
-
-    # feature metadata
-    test_seasons_serializable = [int(s) for s in test_seasons]
-
-    features_info = {
-        "numeric_features": numeric_features,
-        "categorical_features": categorical_features,
-        "test_seasons": test_seasons_serializable,
-        "targets": {
-            "regression": "vote_share",
-            "classification": "is_top5",
-        },
-        "models": {
-            "regression_model_path": str(MODEL_REG_PATH),
-            "top5_classifier_path": str(MODEL_TOP5_PATH),
-        },
+def summarize(bt: pd.DataFrame) -> dict:
+    return {
+        "seasons": len(bt),
+        "winner_rank1_pct": round(float((bt["winner_rank"] == 1).mean()), 3),
+        "winner_top3_pct": round(float((bt["winner_rank"] <= 3).mean()), 3),
+        "winner_rank_mean": round(float(bt["winner_rank"].mean()), 2),
+        "top5_in_top5_mean": round(float(bt["top5_in_top5"].mean()), 2),
+        "top5_in_top10_mean": round(float(bt["top5_in_top10"].mean()), 2),
     }
-
-    print(f"[INFO] Saving feature info to: {FEATURES_PATH}")
-    FEATURES_PATH.write_text(json.dumps(features_info, indent=2))
-
-    print("[DONE] v2 training complete.")
 
 
 # ---------------------------------------------
 # MAIN
 # ---------------------------------------------
+def train_models(run_backtest: bool = True):
+    df = load_training()
+    seasons = sorted(int(s) for s in df["Season"].unique())
+    print(f"[INFO] {len(df):,} player-seasons (GP >= {MIN_GP_TRAIN}), seasons {seasons[0]}–{seasons[-1]}")
+    cov = df.loc[df["vote_share"] > 0, "team_pts_pct"].notna().mean()
+    print(f"[INFO] team_pts_pct coverage among vote-getters: {cov:.1%}")
+
+    summary = None
+    if run_backtest:
+        print("[INFO] Leave-one-season-out backtest...")
+        bt = backtest(df)
+        bt.to_csv(BACKTEST_CSV, index=False)
+        summary = summarize(bt)
+        print("\n" + bt.to_string(index=False))
+        print(f"\n[METRIC] {summary}")
+        print(f"[INFO] Backtest → {BACKTEST_CSV}")
+
+    print(f"[INFO] Fitting shipped models on all {len(seasons)} seasons...")
+    reg, clf = fit(df)
+    joblib.dump(reg, MODEL_REG_PATH)
+    joblib.dump(clf, MODEL_TOP5_PATH)
+
+    features_info = {
+        "numeric_features": NUMERIC_FEATURES,
+        "categorical_features": CATEGORICAL_FEATURES,
+        "trained_seasons": seasons,
+        "evaluation": "leave-one-season-out over trained_seasons",
+        "backtest_summary": summary,
+        "targets": {"regression": "vote_share", "classification": "is_top5"},
+        "models": {
+            "regression_model_path": MODEL_REG_PATH.relative_to(ROOT_DIR).as_posix(),
+            "top5_classifier_path": MODEL_TOP5_PATH.relative_to(ROOT_DIR).as_posix(),
+        },
+    }
+    FEATURES_PATH.write_text(json.dumps(features_info, indent=2))
+    print(f"[INFO] Saved {MODEL_REG_PATH.name}, {MODEL_TOP5_PATH.name}, {FEATURES_PATH.name}")
+    print("[DONE] v2 training complete.")
+
+
 if __name__ == "__main__":
-    train_models()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--no-backtest", action="store_true", help="skip the leave-one-season-out backtest")
+    train_models(run_backtest=not parser.parse_args().no_backtest)

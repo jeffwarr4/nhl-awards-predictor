@@ -11,24 +11,48 @@
     "SOG_per_GP",
     "PPG",
     "PPG_per_GP",
-    "team_win_pct",
-    "PTS_team",
+    "team_pts_pct",
     "is_goalie"
   ],
   "categorical_features": [
     "Pos"
   ],
-  "test_seasons": [
+  "trained_seasons": [
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
     2023,
     2024,
-    2025
+    2025,
+    2026
   ],
+  "evaluation": "leave-one-season-out over trained_seasons",
+  "backtest_summary": {
+    "seasons": 19,
+    "winner_rank1_pct": 0.368,
+    "winner_top3_pct": 0.632,
+    "winner_rank_mean": 3.32,
+    "top5_in_top5_mean": 2.84,
+    "top5_in_top10_mean": 3.84
+  },
   "targets": {
     "regression": "vote_share",
     "classification": "is_top5"
   },
   "models": {
-    "regression_model_path": "C:\\Users\\jeffw\\OneDrive\\DevProj\\nhl-awards-predictor\\Models\\Artifacts\\hart_vote_reg_v2.pkl",
-    "top5_classifier_path": "C:\\Users\\jeffw\\OneDrive\\DevProj\\nhl-awards-predictor\\Models\\Artifacts\\hart_top5_clf_v2.pkl"
+    "regression_model_path": "Models/Artifacts/hart_vote_reg_v2.pkl",
+    "top5_classifier_path": "Models/Artifacts/hart_top5_clf_v2.pkl"
   }
 }
