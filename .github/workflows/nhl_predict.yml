@@ -2,8 +2,9 @@ name: NHL Awards Predictor - Scheduled Run
 
 on:
   schedule:
-    # Every Tuesday @ 6am Pacific (14:00 UTC)
-    - cron: "0 14 * * WED"
+    # Wednesdays 14:23 UTC, October–April (regular season). Kept off :00, when
+    # GitHub delays or drops scheduled runs.
+    - cron: "23 14 * 10-12,1-4 3"
   workflow_dispatch:
 
 jobs:
@@ -17,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
