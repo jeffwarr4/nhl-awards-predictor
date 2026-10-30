@@ -72,7 +72,7 @@ nhl_predict_current.py  →  Data/Processed/nhl_hart_predictions_v2_{season}.csv
 ## Weekly board (`publish/`, port of nfl-awards-predictor)
 
 `nhl_predict_current.py` hands the scored frame to `publish/board.py`, which writes `predictions/{season}/`:
-- `top10_hart_latest.csv` and `board_hart_latest.csv` (30 deep, `BOARD_DEPTH`): same columns, `BOARD_COLS` in `board.py` (a contract: the website will read `board_hart_latest.csv` from GitHub, like NFL's). `why_blurb` is always the last column (top-3 and bubble Whys; blank without a key). 4 rolling timestamped archives each.
+- `top10_hart_latest.csv` and `board_hart_latest.csv` (30 deep, `BOARD_DEPTH`): same columns, `BOARD_COLS` in `board.py` (a contract: the website reads `board_hart_latest.csv` from GitHub, like NFL's). They end with `chips` (top 3, pipe-separated) and then `why_blurb` (top-3 and bubble Whys); both are blank without a key. The website's NHL page and home Trending read `board_hart_latest.csv` from GitHub; the Google Sheet is no longer used by the site. 4 rolling timestamped archives each.
 - **No win probability** on the board or graphics (the softmax sits near 5% for everyone in-season). `Hart_Win_Prob` stays in `pages/` only, for the Sheet.
 - `week` counts 7-day blocks from opening night and `stats_through` is the last date with completed games, both from the Hockey-Reference schedule page.
 - `player_key = first_last_team`, lowercase, accents stripped, apostrophes/periods dropped, hyphens split. It must equal `safe_filename(f"{name} {team}")` in stinger-assets. Teams are Hockey-Reference codes (`VEG`, `TBL`, `LAK`…); a traded player's key uses his current team. Two same-name players on one team (VAN's two Elias Petterssons): the lower-ranked one gets a `_{pos}` suffix.

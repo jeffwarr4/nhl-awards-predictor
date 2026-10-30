@@ -5,7 +5,7 @@ Weekly Hart board: the scored current-season frame from Models/nhl_predict_curre
 Port of nfl-awards-predictor/src/Predictions/predict_current.py (board half).
 
 Outputs (predictions/{season}/)
-  top10_hart_latest.csv    ← top TOP_N, BOARD_COLS + why_blurb
+  top10_hart_latest.csv    ← top TOP_N, BOARD_COLS (ends with chips, why_blurb)
   board_hart_latest.csv    ← BOARD_DEPTH deep, same columns; the website's NHL page reads it from GitHub
   {stem}_{ts}.csv          ← archives (ARCHIVES_TO_KEEP most recent of each)
   .prev_board_hart.csv     ← last week's 30-deep board; drives rank_delta / movement
@@ -27,7 +27,7 @@ from config import (
 )
 
 # Column order of top10_hart_latest.csv / board_hart_latest.csv (a contract: the
-# website reads board_hart_latest.csv by these names). why_blurb is always last.
+# website reads board_hart_latest.csv by these names). chips (top 3, pipe-separated) then why_blurb end it.
 BOARD_COLS = [
     "player_key", "rank", "rank_delta", "movement", "player_name", "team", "position",
     "model_score",
@@ -35,7 +35,7 @@ BOARD_COLS = [
     "goalie_wins", "save_pct", "gaa",
     "team_record", "team_win_pct", "team_points",
     "season", "week", "stats_through", "updated_utc",
-    "why_blurb",
+    "chips", "why_blurb",
 ]
 
 
@@ -111,6 +111,7 @@ def build_board(scored: pd.DataFrame, season: int, week: int, through: date) -> 
     board["week"] = week
     board["stats_through"] = through.isoformat()
     board["updated_utc"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    board["chips"] = ""
     board["why_blurb"] = ""
     return board
 
@@ -221,7 +222,7 @@ def publish_board(scored: pd.DataFrame, season: int, first_game: date, through: 
 
 
 def publish_outputs(board: pd.DataFrame, outdir: Path, season: int, week: int, through: date) -> None:
-    """Chips + bubble Whys (needs ANTHROPIC_API_KEY) → board CSVs get why_blurb →
+    """Chips + bubble Whys (needs ANTHROPIC_API_KEY) → board CSVs get chips + why_blurb →
     board and bubble graphics → carousel caption (needs key)."""
     from publish.generate_chips import generate_chips, load_chips
     from publish.render_graphics import render_board, render_bubble_graphic
@@ -234,7 +235,9 @@ def publish_outputs(board: pd.DataFrame, outdir: Path, season: int, week: int, t
         chip_df = load_chips(outdir, week)
     if not chip_df.empty:
         whys = dict(zip(chip_df["player_key"], chip_df["Why"]))
-        board = board.assign(why_blurb=board["player_key"].map(whys).fillna(""))
+        chips = dict(zip(chip_df["player_key"], chip_df["Chip"].fillna("")))
+        board = board.assign(chips=board["player_key"].map(chips).fillna(""),
+                             why_blurb=board["player_key"].map(whys).fillna(""))
         for df, name in ((board.head(TOP_N), "top10_hart_latest.csv"), (board, "board_hart_latest.csv")):
             df[BOARD_COLS].to_csv(outdir / name, index=False)
 
