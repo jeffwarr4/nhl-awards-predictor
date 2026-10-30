@@ -1,9 +1,9 @@
 player_key,Chip,Why,week
-connor_mcdavid_edm,Point machine | Playmaking | Winning team,"36 points (2.77/GP), 28 assists, and a +17 rating on a 9-2-2 team.",5
-nathan_mackinnon_col,Point machine | Shot volume | Winning team,Leads the model with 22 points (1.69 PTS/GP) and 52 shots while Colorado holds a .583 win percentage.,5
-evan_bouchard_edm,Point machine | Plus impact | Winning team,"Leads the rankings with 22 points in 13 games (1.69 PTS/GP), a +19 rating, and a 9-2-2 team record.",5
-sebastian_aho_car,,19 points trails Draisaitl's 24 despite an 11-2-2 team record,5
-tage_thompson_buf,,15 pts in 13 games (1.15 PTS/GP) vs. Draisaitl's 1.85 on a 9-2-2 team,5
-brandon_hagel_tbl,,16 pts in 12 GP vs 24 for Draisaitl; 1.33 PTS/GP vs 1.85,5
-leo_carlsson_ana,,Team at 5-7-1 vs. Draisaitl's 9-2-2; 18 pts in 13 games,5
-jake_guentzel_tbl,,13 PTS in 12 games vs Draisaitl's 24; team 8-3-1,5
+connor_mcdavid_edm,Point machine | Playmaker | Winning team,"36 points in 13 games (2.77 per game), with 28 assists and a +17 rating on a 9-2-2 team.",5
+nathan_mackinnon_col,Point machine | Shot volume | Winning team,"22 points in 13 games (1.69 per game), 52 shots, and a +4 rating on a team with a .583 win percentage.",5
+evan_bouchard_edm,Point machine | Plus impact | Winning team,"22 points in 13 games, a +19 rating, and a 9-2-2 team record back the #3 spot.",5
+sebastian_aho_car,,"11-2-2 team record; 19 pts vs Draisaitl's 24, 1.27 PTS/GP vs 1.85",5
+tage_thompson_buf,,Team 6-4-3 and 15 points in 13 games; Draisaitl has 24 on a 9-2-2 team,5
+brandon_hagel_tbl,,16 points and 1.33 PTS/GP trail Draisaitl's 24 and 1.85 PTS/GP,5
+leo_carlsson_ana,,Team at 5-7-1 (.417) holds back 18 points in 13 games,5
+jake_guentzel_tbl,,1.08 PTS/GP trails Draisaitl's 1.85; 13 points in 12 games,5
