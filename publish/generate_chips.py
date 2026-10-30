@@ -40,6 +40,7 @@ Rules:
 - "chip": exactly 3 short tags (1-3 words each), separated by " | ". Each tag names a distinct statistical strength (e.g. "Point machine", "Power-play threat", "Shot volume", "Two-way D", "Winning team", "Elite save %").
 - "why": one sentence, under 100 characters, giving the stat-driven reason for the player's rank. No fluff, no adjectives that aren't backed by a stat in the input.
 - Base every word ONLY on the stats given in the user message. Never invent, infer, or assume a stat that wasn't provided.
+- You see only this player's numbers, not anyone else's. Never say he leads, tops, paces or ranks first in anything (not the league, the team, the model or the rankings), and don't compare him to other players.
 - Tags describe skill/performance, not identity — don't put the player's name, team, or rank number in the chip itself.
 - Output ONLY valid JSON in exactly this shape, nothing else, no markdown fences, no preamble:
 {"chip": "Tag1 | Tag2 | Tag3", "why": "One sentence explanation."}"""
