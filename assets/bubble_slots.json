@@ -1,0 +1,113 @@
+{
+  "canvas": [
+    1080,
+    1350
+  ],
+  "slots": [
+    {
+      "rank": 11,
+      "cx": 300,
+      "cy": 495,
+      "d": 330,
+      "label_box": [
+        115,
+        668,
+        485,
+        780
+      ],
+      "rank_badge": [
+        183,
+        611
+      ],
+      "logo_badge": [
+        416,
+        378
+      ]
+    },
+    {
+      "rank": 12,
+      "cx": 790,
+      "cy": 550,
+      "d": 290,
+      "label_box": [
+        625,
+        703,
+        955,
+        815
+      ],
+      "rank_badge": [
+        687,
+        652
+      ],
+      "logo_badge": [
+        892,
+        447
+      ]
+    },
+    {
+      "rank": 13,
+      "cx": 545,
+      "cy": 952,
+      "d": 255,
+      "label_box": [
+        380,
+        1087,
+        710,
+        1199
+      ],
+      "rank_badge": [
+        455,
+        1041
+      ],
+      "logo_badge": [
+        634,
+        862
+      ]
+    },
+    {
+      "rank": 14,
+      "cx": 215,
+      "cy": 1095,
+      "d": 225,
+      "label_box": [
+        50,
+        1215,
+        380,
+        1327
+      ],
+      "rank_badge": [
+        135,
+        1174
+      ],
+      "logo_badge": [
+        294,
+        1015
+      ]
+    },
+    {
+      "rank": 15,
+      "cx": 870,
+      "cy": 1105,
+      "d": 200,
+      "label_box": [
+        705,
+        1213,
+        1035,
+        1325
+      ],
+      "rank_badge": [
+        799,
+        1175
+      ],
+      "logo_badge": [
+        940,
+        1034
+      ]
+    }
+  ],
+  "footer": {
+    "cx": 540,
+    "cy": 1272
+  },
+  "notes": "Sizes fixed by rank (#11 largest). Paste circular headshot into each slot, then composite 'Hart_Bubble_overlay.png' on top."
+}

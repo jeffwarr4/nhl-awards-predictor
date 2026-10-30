@@ -4,11 +4,9 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Allow model artifacts (override *.pkl ignore rule)
-!Models/Artifacts/*.pkl
-
-# Ignore all other pickle files
+# Ignore pickle files, except the committed model artifacts (the exception must come after)
 *.pkl
+!Models/Artifacts/*.pkl
 
 # Virtual environments
 .venv/
@@ -28,8 +26,6 @@ Data/Processed/*.csv
 
 # Logs
 *.log
-
-echo Assets/>> .gitignore
 
 Assests/
 

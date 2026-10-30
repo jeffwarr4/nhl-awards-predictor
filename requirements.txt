@@ -6,3 +6,5 @@ joblib
 requests
 beautifulsoup4
 lxml
+pillow>=10        # board + bubble graphics
+anthropic>=2.1    # chips, Whys, caption; skipped without ANTHROPIC_API_KEY

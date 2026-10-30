@@ -18,13 +18,20 @@ Pipeline
    were trained on full seasons. Displayed stats stay the actual season-to-date values.
 5. hart_common.hart_scores → Hart_FinalScore → Hart_Rank.
 
+6. publish/board.py → predictions/{season}/ weekly board, movement, headshot
+   candidates, chips/Whys, board + bubble graphics, carousel caption.
+
 Run:
     python Models/nhl_predict_current.py
+    python Models/nhl_predict_current.py --outdir <scratch> --no-publish   # dry run
 """
 
+import argparse
+import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from io import StringIO
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -242,6 +249,18 @@ def get_current_standings(season_year: int) -> pd.DataFrame:
     return st
 
 
+def get_season_calendar(season_year: int) -> tuple[date, date]:
+    """(first game date, last date with a completed game) from the schedule page.
+    Weeks on the board count from opening night; 'stats through' is the last game day."""
+    url = f"https://www.hockey-reference.com/leagues/NHL_{season_year}_games.html"
+    games = dedupe_columns(flatten_columns(pd.read_html(StringIO(fetch_html(url)))[0]))
+    days = pd.to_datetime(games["Date"], errors="coerce")
+    played = days[pd.to_numeric(games["G"], errors="coerce").notna()]
+    if days.dropna().empty or played.empty:
+        raise ValueError(f"[ERROR] No played games on the {season_year} schedule")
+    return days.min().date(), played.max().date()
+
+
 # ============================================================================
 # BUILD FULL CURRENT-SEASON DATAFRAME
 # ============================================================================
@@ -421,6 +440,24 @@ def predict_current_hart_v2(season_year: int, top_k_softmax: int = 25):
 # MAIN
 # ============================================================================
 
-if __name__ == "__main__":
+def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")   # ↑/↓ arrows and accented names on a cp1252 console
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--outdir", type=Path, default=None,
+                        help="write the weekly board here instead of predictions/{season}/")
+    parser.add_argument("--no-publish", action="store_true",
+                        help="board CSVs only: skip candidates, chips, graphics and caption")
+    args = parser.parse_args()
+
     print(f"[INFO] Running Hart v2 prediction for season ending {SEASON_END_YEAR}")
-    predict_current_hart_v2(SEASON_END_YEAR)
+    first_game, through = get_season_calendar(SEASON_END_YEAR)
+    scored = predict_current_hart_v2(SEASON_END_YEAR)
+
+    from publish.board import publish_board
+    publish_board(scored, SEASON_END_YEAR, first_game, through,
+                  outdir=args.outdir, publish=not args.no_publish)
+
+
+if __name__ == "__main__":
+    main()

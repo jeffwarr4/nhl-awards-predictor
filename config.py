@@ -7,6 +7,7 @@
 # Bump SEASON_END_YEAR and TRAIN_END each season; nothing else hardcodes a year.
 # ---------------------------------------------------------------
 
+import os
 from pathlib import Path
 
 # ── Seasons ───────────────────────────────────────────────────────
@@ -47,3 +48,25 @@ MIN_GP_TRAIN = 20        # full-season rows only
 # ── In-season scoring ─────────────────────────────────────────────
 SEASON_GAMES        = 82
 MIN_TEAM_GAME_SHARE = 0.60   # must have played ≥60% of his team's games
+
+# ── Weekly board + publishing (publish/) ──────────────────────────
+PREDICTIONS      = ROOT_DIR / "predictions"
+CURRENT_PRED_DIR = PREDICTIONS / str(SEASON_END_YEAR)
+CANDIDATES_CSV   = PREDICTIONS / "nhl_candidates.csv"   # pulled by stinger-assets' headshot sync
+PAGES_DIR        = ROOT_DIR / "pages"                     # legacy Google Sheet feed
+FONTS_DIR        = ROOT_DIR / "assets" / "fonts"
+
+# 1080×1350 backgrounds. The bubble background, overlay and slot geometry come
+# from publish/make_bubble_bg.py.
+BOARD_BACKGROUND  = ROOT_DIR / "Hart_Trophy_bg.png"
+BUBBLE_BACKGROUND = ROOT_DIR / "Hart_Bubble_bg.png"
+BUBBLE_OVERLAY    = ROOT_DIR / "Hart_Bubble_overlay.png"
+BUBBLE_SLOTS      = ROOT_DIR / "assets" / "bubble_slots.json"
+
+# Sibling repo with headshots/logos. CI checks it out and sets the env var.
+STINGER_ASSETS_DIR = Path(os.environ.get("STINGER_ASSETS_DIR", str(ROOT_DIR.parent / "stinger-assets")))
+
+TOP_N            = 10
+BOARD_DEPTH      = 30        # saved board depth; everyone on it is a headshot candidate
+BUBBLE_RANKS     = (11, 15)  # inclusive; the "On the Bubble" slide
+ARCHIVES_TO_KEEP = 4
