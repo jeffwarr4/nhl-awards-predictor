@@ -1,10 +1,10 @@
 """
 Render the weekly Hart Trophy board graphic (1080×1350) by compositing headshots,
-team logos, chips and stat blocks onto Hart_Trophy_bg.png, plus the "On the Bubble"
-slide for ranks 11–15.
+team logos, chips and stat blocks onto Hart_Ice_bg.png (publish/make_ice_bg.py), plus
+the "On the Bubble" slide for ranks 11–15.
 
 Port of nfl-awards-predictor/src/publish/render_graphics.py: same fonts, card anatomy
-and percentile-based select_top_stats. Hart_Trophy_bg.png is light ice, not dark turf,
+and percentile-based select_top_stats. The background is light ice, not dark turf,
 so everything that isn't on a card or row plate gets its own dark plate.
 
 Assets come from stinger-assets (STINGER_ASSETS_DIR):
@@ -430,7 +430,7 @@ def draw_footer(canvas: Image.Image, row_top: int, row_left: int, through: date)
 
 
 def placeholder_background() -> Image.Image:
-    """Plain dark board with a header band — used if Hart_Trophy_bg.png is missing."""
+    """Plain dark board with a header band — used if the board background is missing."""
     bg = Image.new("RGBA", (IMG_W, IMG_H), (12, 14, 20, 255))
     d = ImageDraw.Draw(bg)
     for y in range(IMG_H):                      # subtle vertical gradient

@@ -1,4 +1,5 @@
-"""Build the Hart 'On the Bubble' background for ranks 11-15 from Hart_Trophy_bg.png.
+"""Build the Hart 'On the Bubble' background for ranks 11-15 from the board background
+(config.BOARD_BACKGROUND, Hart_Ice_bg.png).
 
 Port of nfl-awards-predictor/src/publish/make_bubble_bg.py, restyled for the light
 ice board: navy wells and plates instead of dark turf, gold rings, ice-blue micro-bubbles.
