@@ -1,6 +1,6 @@
 # .github/workflows/nhl_predict.yml
 # ---------------------------------------------------------------
-# Weekly Hart Trophy board. Runs Thursdays 14:23 UTC, October–April
+# Weekly Hart Trophy board. Runs Thursdays 15:17 UTC (Cloudflare Worker), October–April
 # (the regular season), plus manual runs.
 #
 # What it does:
@@ -27,9 +27,11 @@ run-name: ${{ (github.event_name == 'schedule' || inputs.scheduled == 'true') &&
 
 on:
   schedule:
-    # Thursdays 14:23 UTC, October–April (regular season). Kept off :00, when
+    # Started on time by the stinger-scheduler Cloudflare Worker (stinger-website/scheduler) at 15:17 UTC;
+    # this cron is the late backup, and the guard job makes it a no-op once the Worker's run succeeded.
+    # Thursdays 17:17 UTC, October–April (regular season). Kept off :00, when
     # GitHub delays or drops scheduled runs.
-    - cron: "23 14 * 10-12,1-4 4"
+    - cron: "17 17 * 10-12,1-4 4"
   workflow_dispatch:
     inputs:
       scheduled:

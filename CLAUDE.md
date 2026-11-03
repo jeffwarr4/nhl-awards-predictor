@@ -103,7 +103,7 @@ All data comes from Hockey-Reference.com with exponential backoff for 429/5xx. `
 
 ## Automation
 
-`.github/workflows/nhl_predict.yml` runs Thursdays at 14:23 UTC, October–April (off :00, when GitHub delays scheduled runs), plus manual dispatch:
+`.github/workflows/nhl_predict.yml` is started Thursdays at 15:17 UTC, October–April, by the stinger-scheduler Cloudflare Worker (`stinger-website/scheduler`); its own cron (Thursdays 17:17 UTC) is a late backup. Plus manual dispatch:
 1. Checks out stinger-assets as a sibling (`STINGER_ASSETS_DIR`) and runs `nhl_predict_current.py` on Python 3.12.
 2. Fails if the top-10 board is empty. The script itself also exits non-zero before writing a short board.
 3. Copies the Sheet CSVs to `pages/` and uploads the CSV/PNG/TXT outputs as run artifacts.
