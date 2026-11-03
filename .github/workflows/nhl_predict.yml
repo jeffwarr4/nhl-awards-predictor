@@ -23,15 +23,22 @@
 # ---------------------------------------------------------------
 
 name: NHL Awards Predictor - Scheduled Run
+run-name: ${{ (github.event_name == 'schedule' || inputs.scheduled == 'true') && 'Weekly NHL Hart (scheduled)' || 'Weekly NHL Hart (manual)' }}
 
 on:
   schedule:
     # Thursdays 14:23 UTC, October–April (regular season). Kept off :00, when
     # GitHub delays or drops scheduled runs.
     - cron: "23 14 * 10-12,1-4 4"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      scheduled:
+        description: "Started by the scheduler (skips if this slot already ran). Leave false for a manual run."
+        required: false
+        default: "false"
 
 permissions:
+  actions: read
   contents: write
 
 concurrency:
@@ -39,7 +46,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Skip a scheduled run when this slot's board is already done. "Scheduled" means GitHub's cron or a
+  # dispatch with scheduled=true (the Cloudflare Worker that starts these jobs on time). A late cron after
+  # an on-time Worker run would otherwise redo the board and rewrite the AI chips and captions. Runs started
+  # by hand from the Actions tab never skip.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCHEDULED: ${{ github.event_name == 'schedule' || inputs.scheduled == 'true' }}
+        run: |
+          if [ "$SCHEDULED" != "true" ]; then echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          SINCE=$(date -u -d '-20 hours' +%Y-%m-%dT%H:%M:%SZ)
+          DONE=$(gh run list -R "${{ github.repository }}" --workflow "nhl_predict.yml" --status success --created ">=$SINCE" --limit 20 --json databaseId,event,displayTitle --jq '[.[] | select(.databaseId != ${{ github.run_id }})
+                       | select(.event == "schedule" or (.displayTitle | endswith("(scheduled)")))] | length')
+          echo "Scheduled runs that succeeded since $SINCE: $DONE"
+          if [ "$DONE" -gt 0 ]; then
+            echo "::notice::This slot's scheduled run already succeeded; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   predict:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
 
     steps:
