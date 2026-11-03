@@ -1,6 +1,6 @@
 # .github/workflows/nhl_predict.yml
 # ---------------------------------------------------------------
-# Weekly Hart Trophy board. Runs Wednesdays 14:23 UTC, October–April
+# Weekly Hart Trophy board. Runs Thursdays 14:23 UTC, October–April
 # (the regular season), plus manual runs.
 #
 # What it does:
@@ -26,9 +26,9 @@ name: NHL Awards Predictor - Scheduled Run
 
 on:
   schedule:
-    # Wednesdays 14:23 UTC, October–April (regular season). Kept off :00, when
+    # Thursdays 14:23 UTC, October–April (regular season). Kept off :00, when
     # GitHub delays or drops scheduled runs.
-    - cron: "23 14 * 10-12,1-4 3"
+    - cron: "23 14 * 10-12,1-4 4"
   workflow_dispatch: {}
 
 permissions:
