@@ -42,9 +42,10 @@ TEAM_HASHTAGS = {
 SYSTEM_PROMPT = """You are a sports social media manager for STINGER, an NHL awards prediction tracker.
 
 Write the weekly update post for our Hart Trophy carousel: slide 1 is the top-10 board, slide 2 is "On the Bubble" (ranks 11-15, the players knocking on the door). Produce:
-1. A punchy caption body — 3 sentences max, under 320 characters total. The first 1-2 sentences cover the top of the board (slide 1). The last sentence names the top bubble player and why they're close to the top 10 (slide 2). Data-driven and slightly hype. Reference actual stats from the input. You may use the history note for context, but don't force it. No filler ("Let's dive in!", "Check this out!"). 1-2 emoji max. Do NOT include hashtags in the body.
-2. 15 hashtags for Instagram. Choose ONLY from the approved base tags below plus the player-name and team tags given in the user message. Do NOT invent tags that aren't in the approved list or given in the message.
-3. 5 hashtags for Facebook — the 5 most relevant from your Instagram list (favour generic NHL + award tags over player/team specifics).
+1. A punchy caption body — 3 sentences max, under 320 characters total. The first 1-2 sentences cover the top of the board (slide 1). The last sentence names the top bubble player and why they're close to the top 10 (slide 2). Data-driven and slightly hype. Reference actual stats from the input. You may use the history note for context, but don't force it. No filler ("Let's dive in!", "Check this out!"). 1-2 emoji max. Do NOT include hashtags in the body. Write ranks as "No. 11", never "#11" (Instagram reads "#11" as a hashtag).
+   Describe team records only with the numbers given: never call a record perfect or undefeated unless it has no losses, and don't claim standings (division or conference leads, playoff spots) the input doesn't state.
+2. 5 hashtags for Instagram, most important first (Instagram now limits posts to 5). Choose ONLY from the approved base tags below plus the player-name and team tags given in the user message. Do NOT invent tags that aren't in the approved list or given in the message.
+3. 5 hashtags for Facebook, most important first (favour generic NHL + award tags over player/team specifics).
 
 Approved base hashtags (pick the most relevant, always include #StingerNHL):
 #NHL #NHLTwitter #HockeyTwitter #Hockey #NHL{season_tag} #NHLSeason
@@ -56,7 +57,7 @@ Output ONLY valid JSON in exactly this shape, no markdown fences, no preamble:
 
 
 # Context for the bubble sentence (from the 2025-26 weekly snapshots vs the actual vote).
-BUBBLE_HISTORY = ("2025-26: Nikita Kucherov sat #25 on our mid-December board and won the Hart.")
+BUBBLE_HISTORY = ("2025-26: Nikita Kucherov sat No. 25 on our mid-December board and won the Hart.")
 
 
 def _build_prompt(board: pd.DataFrame, chip_df: pd.DataFrame, week: int) -> str:
@@ -64,7 +65,7 @@ def _build_prompt(board: pd.DataFrame, chip_df: pd.DataFrame, week: int) -> str:
     board = board.sort_values("rank")
 
     def line(p: pd.Series) -> str:
-        out = (f"#{int(p['rank'])} {p['player_name']} ({p['team']} {p['position']}, "
+        out = (f"No. {int(p['rank'])} {p['player_name']} ({p['team']} {p['position']}, "
                f"team {p['team_record']}): {stat_line(p)}")
         if isinstance(whys.get(p["player_key"]), str) and whys[p["player_key"]]:
             out += f"  | {whys[p['player_key']]}"
