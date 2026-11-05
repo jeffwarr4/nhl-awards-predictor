@@ -1,11 +1,11 @@
 player_key,rank,rank_delta,movement,player_name,team,position,model_score,games,team_games,goals,assists,points,ppg,pp_goals,shots,plus_minus,atoi,goalie_wins,save_pct,gaa,team_record,team_win_pct,team_points,season,week,stats_through,updated_utc,chips,why_blurb
-connor_mcdavid_edm,1,,NEW,Connor McDavid,EDM,C,0.905233,13,13,8,28,36,2.77,0,33,17,23:30,,,,9-2-2,0.818,20,2027,5,2026-10-29,2026-10-30 21:51,Point machine | Plus-minus impact | Winning team,"36 points in 13 games (2.77 per game), a +17 rating, and a 9-2-2 team record."
-nathan_mackinnon_col,2,,NEW,Nathan MacKinnon,COL,C,0.823487,13,13,8,14,22,1.69,2,52,4,20:45,,,,7-5-1,0.583,15,2027,5,2026-10-29,2026-10-30 21:51,Point machine | Shot volume | Winning team,22 points (1.69 PTS/GP) on 52 shots while Colorado holds a .583 win percentage.
-evan_bouchard_edm,3,,NEW,Evan Bouchard,EDM,D,0.764895,13,13,7,15,22,1.69,1,39,19,26:10,,,,9-2-2,0.818,20,2027,5,2026-10-29,2026-10-30 21:51,Point producer | Plus impact | Winning team,"22 points in 13 games (1.69 per game), a +19 rating, and a .818 team win pct support the ranking."
-david_pastrnak_bos,4,,NEW,David Pastrňák,BOS,RW,0.714333,14,14,7,11,18,1.29,3,46,5,20:02,,,,9-4-1,0.692,19,2027,5,2026-10-29,2026-10-30 21:51,,
-matthew_tkachuk_fla,5,,NEW,Matthew Tkachuk,FLA,LW,0.657032,13,13,4,16,20,1.54,1,27,1,18:59,,,,7-4-2,0.636,16,2027,5,2026-10-29,2026-10-30 21:51,,
-jack_eichel_veg,6,,NEW,Jack Eichel,VEG,C,0.655587,14,14,7,13,20,1.43,0,38,9,19:54,,,,9-4-1,0.692,19,2027,5,2026-10-29,2026-10-30 21:51,,
-kirill_kaprizov_min,7,,NEW,Kirill Kaprizov,MIN,LW,0.617233,15,15,14,10,24,1.6,4,51,10,21:44,,,,9-3-3,0.75,21,2027,5,2026-10-29,2026-10-30 21:51,,
-quinn_hughes_min,8,,NEW,Quinn Hughes,MIN,D,0.609911,15,15,4,16,20,1.33,2,44,8,27:37,,,,9-3-3,0.75,21,2027,5,2026-10-29,2026-10-30 21:51,,
-auston_matthews_tor,9,,NEW,Auston Matthews,TOR,C,0.598552,15,15,10,13,23,1.53,3,44,6,20:37,,,,7-6-2,0.538,16,2027,5,2026-10-29,2026-10-30 21:51,,
-leon_draisaitl_edm,10,,NEW,Leon Draisaitl,EDM,C,0.586888,13,13,12,12,24,1.85,6,48,12,21:43,,,,9-2-2,0.818,20,2027,5,2026-10-29,2026-10-30 21:51,,
+connor_mcdavid_edm,1,0,–,Connor McDavid,EDM,C,0.904786,16,16,9,31,40,2.5,0,43,20,23:31,,,,11-2-3,0.846,25,2027,6,2026-11-04,2026-11-05 15:18,Point machine | Shot volume | Winning team,"2.50 points per game with 40 total, 43 shots, and a +20 rating on a team with a .846 win percentage."
+evan_bouchard_edm,2,1,↑1,Evan Bouchard,EDM,D,0.836201,16,16,9,19,28,1.75,2,45,23,25:57,,,,11-2-3,0.846,25,2027,6,2026-11-04,2026-11-05 15:18,Point machine | Plus-minus driver | Winning team,"28 points in 16 games (1.75 per game), a +23 rating, and an 11-2-3 team record."
+nathan_mackinnon_col,3,-1,↓1,Nathan MacKinnon,COL,C,0.80549,16,16,9,18,27,1.69,2,61,5,20:29,,,,9-6-1,0.6,19,2027,6,2026-11-04,2026-11-05 15:18,Point machine | Shot volume | Winning team,"27 points in 16 games (1.69 per game) on 61 shots, with a +5 rating for a 9-6-1 team."
+jack_eichel_veg,4,2,↑2,Jack Eichel,VEG,C,0.714292,17,17,7,15,22,1.29,0,40,6,20:04,,,,10-5-2,0.667,22,2027,6,2026-11-04,2026-11-05 15:18,,
+kirill_kaprizov_min,5,2,↑2,Kirill Kaprizov,MIN,LW,0.69862,17,17,15,11,26,1.53,4,54,12,21:43,,,,11-3-3,0.786,25,2027,6,2026-11-04,2026-11-05 15:18,,
+auston_matthews_tor,6,3,↑3,Auston Matthews,TOR,C,0.680711,17,17,11,15,26,1.53,3,51,9,20:34,,,,8-7-2,0.533,18,2027,6,2026-11-04,2026-11-05 15:18,,
+matthew_tkachuk_fla,7,-2,↓2,Matthew Tkachuk,FLA,LW,0.678908,16,16,4,18,22,1.38,1,33,0,18:43,,,,9-5-2,0.643,20,2027,6,2026-11-04,2026-11-05 15:18,,
+leon_draisaitl_edm,8,2,↑2,Leon Draisaitl,EDM,C,0.659238,16,16,13,16,29,1.81,7,57,15,21:33,,,,11-2-3,0.846,25,2027,6,2026-11-04,2026-11-05 15:18,,
+clayton_keller_uta,9,15,↑15,Clayton Keller,UTA,C,0.6563,16,16,4,17,21,1.31,2,41,-8,18:12,,,,10-6-0,0.625,20,2027,6,2026-11-04,2026-11-05 15:18,,
+tage_thompson_buf,10,2,↑2,Tage Thompson,BUF,C,0.627824,15,15,10,8,18,1.2,2,65,6,19:26,,,,7-5-3,0.583,17,2027,6,2026-11-04,2026-11-05 15:18,,
