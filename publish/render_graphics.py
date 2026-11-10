@@ -597,9 +597,11 @@ def render_bubble_graphic(board: pd.DataFrame, chip_df: pd.DataFrame, gfx_dir: P
     fx, fy = layout["footer"]["cx"], layout["footer"]["cy"]
     f1, f2 = _font("agency_bold", 24), _font("fg_med_cond", 16)
     t1, t2 = through_label(through), "Bubble size = closeness to the top 10"
-    draw.text((fx - text_w(draw, t1, f1) // 2, fy - 14), t1, font=f1, fill=GOLD,
+    t3 = "*Movement = rank change within our top 30"
+    draw.text((fx - text_w(draw, t1, f1) // 2, fy - 20), t1, font=f1, fill=GOLD,
               stroke_width=1, stroke_fill=BLACK)
-    draw.text((fx - text_w(draw, t2, f2) // 2, fy + 20), t2, font=f2, fill=(190, 200, 215))
+    draw.text((fx - text_w(draw, t2, f2) // 2, fy + 10), t2, font=f2, fill=(190, 200, 215))
+    draw.text((fx - text_w(draw, t3, f2) // 2, fy + 28), t3, font=f2, fill=(190, 200, 215))
 
     gfx_dir.mkdir(parents=True, exist_ok=True)
     out = gfx_dir / f"bubble_board_{season}_wk{week:02d}.png"
