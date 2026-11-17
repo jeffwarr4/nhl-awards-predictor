@@ -1,0 +1,11 @@
+rank,player_name,team,position,games,goals,assists,points,ppg,plus_minus,team_win_pct,model_score,season
+1,Connor McDavid,EDM,C,82,48,90,138,1.683,17,0.5775,0.9052,2025-26
+2,Nathan MacKinnon,COL,C,80,53,74,127,1.588,57,0.7746,0.7927,2025-26
+3,Nikita Kucherov,TBL,RW,76,44,86,130,1.711,43,0.6579,0.7858,2025-26
+4,Macklin Celebrini,SJS,F,82,45,70,115,1.402,8,0.527,0.7191,2025-26
+5,David Pastrňák,BOS,RW,77,29,71,100,1.299,4,0.625,0.6322,2025-26
+6,Nick Suzuki,MTL,C,82,29,72,101,1.232,37,0.6667,0.5931,2025-26
+7,Wyatt Johnston,DAL,C,82,45,41,86,1.049,-5,0.7143,0.5915,2025-26
+8,Leon Draisaitl,EDM,C,65,35,62,97,1.492,13,0.5775,0.5291,2025-26
+9,Mark Scheifele,WPG,C,82,36,67,103,1.256,0,0.5,0.5185,2025-26
+10,Martin Nečas,COL,C,78,38,62,100,1.282,47,0.7746,0.5058,2025-26
