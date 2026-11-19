@@ -90,6 +90,28 @@ season's last regular-season board, run `python scripts/snapshot_board.py --fina
 `board_hart_final.csv`, which the website's season archive pages read. Don't edit or delete the weekly or final files; they're the
 season history.
 
+## Weekly reel (`publish/render_reel.py`, port of nfl-awards-predictor)
+
+One story per week as a silent 1080×1920 MP4 (25 s + 2 s hold) plus a narration script Jeff records over it in
+CapCut; posted the day after the board. `python -m publish.render_reel [--outdir DIR] [--frames-only] [--no-script]
+[--story FILE]`; tests: `python -m pytest tests/`.
+- `reel_story.pick_story` (pure) takes the first match: new No. 1 (or "back at No. 1" if he held it on an earlier
+  `board_hart_wkNN.csv`), biggest climber into the top 5, 11+ into the top 10, biggest drop by a former top-5
+  player, else a profile of No. 1. Players are matched by `player_key`, as in `.prev_board_hart.csv`, so a player
+  traded since last week reads as NEW.
+- `reel_script.py` writes five timed beats in Jeff's first-person voice on `REEL_MODEL` (Opus 5.5; chips stay on
+  Haiku) with the hockey stats, W-L-OTL record and the player's rank on earlier weekly boards. It checks the word
+  count, the closing line, and that no %/odds language slipped in. Settings are `REEL_*` in `config.py`.
+- The background is the board's rink tinted navy (so white text reads on the light ice), and the header band is
+  shown as a gold-bordered badge. Stat cards use `player_stats` (goalies get the goalie set).
+- Outputs in `predictions/{season}/reel/`: `reel_script.txt` and `reel_meta.json` are committed; `reel_latest.mp4`
+  is gitignored and the workflow uploads it to the repo's `reel-latest` release as `nhl_reel_{season}_wk{NN}.mp4`.
+  stinger-website's social-drafts job emails it with the script. Both workflow steps are `continue-on-error`, after
+  the headshot fetch. `nhl_predict_current.py` doesn't render the reel; run it on its own locally.
+- One-off reels (a correction, a feature, or a hand-written week): a story file names the player and hook and can
+  set labels, cards and a script; it writes `reel_<name>.*` beside the weekly files. Upload the MP4 by hand.
+  Week 8 of 2026–27 (Kaprizov, No. 15 → No. 3) was the first, before the workflow step existed.
+
 ## stinger-assets contract
 
 Headshots: `nhl/headshots/{player_key}.png` (600×436). Logos: `nhl/logos/{team}.png`, lowercase Hockey-Reference codes, except `LAK` → `la.png` (`publish/stats.py: LOGO_CODES`). The runner is case-sensitive; Windows isn't. stinger-assets' `scripts/merge_candidates.py` must list `nhl-awards-predictor/main/predictions/nhl_candidates.csv`. Its `sync_espn_headshots.py` needs NHL team aliases (Hockey-Reference → ESPN: `LAK→LA, NJD→NJ, SJS→SJ, TBL→TB, UTA→UTAH, VEG→VGK`) for team-narrowed matching.
