@@ -1,0 +1,21 @@
+{
+  "name": "kaprizov_wk08",
+  "story_type": "top5_climber",
+  "player_name": "Kirill Kaprizov",
+  "prev_rank": 15,
+  "hook": "Up 12 spots into the top 5",
+  "note": "Week 8 (stats through Nov 18): the weekly picker's story, with a hand-written script because the reel step isn't in the workflow yet.",
+  "cards": [["Points", "40"], ["Goals", "17"], ["Plus-minus", "+21"]],
+  "script": {
+    "beats": [
+      {"scene": "hook", "text": "Biggest jump in our Hart model this week."},
+      {"scene": "player", "text": "Kirill Kaprizov was No. 15 last week. Now he's No. 3. That's twelve spots in one week."},
+      {"scene": "why", "text": "Here's what jumped out to me. Forty points in 23 games, 17 goals, a plus-21, and the Wild are 16-3-4."},
+      {"scene": "context", "text": "Connor McDavid still sits at No. 1, with 55 points."},
+      {"scene": "cta", "text": "Want to see the rest? Full board at stingercollectibles.com"}
+    ],
+    "captions": ["40 points in 23 games", "17 goals, plus-21", "Wild are 16-3-4"],
+    "instagram_caption": "Kirill Kaprizov jumped from No. 15 to No. 3 on our Hart Trophy board: 40 points in 23 games, 17 goals and a plus-21 for the 16-3-4 Wild. Connor McDavid still holds No. 1. Full board at stingercollectibles.com",
+    "hashtags": ["#StingerNHL", "#HartTrophy", "#KirillKaprizov", "#mnwild", "#NHLStats"]
+  }
+}

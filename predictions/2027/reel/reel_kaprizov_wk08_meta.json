@@ -1,0 +1,53 @@
+{
+  "sport": "nhl",
+  "season": 2027,
+  "through_week": 8,
+  "stats_through": "2026-11-18",
+  "story_type": "top5_climber",
+  "hook": "Up 12 spots into the top 5",
+  "reason": "Week 8 (stats through Nov 18): the weekly picker's story, with a hand-written script because the reel step isn't in the workflow yet.",
+  "player": {
+    "player_name": "Kirill Kaprizov",
+    "team": "MIN",
+    "position": "LW",
+    "player_key": "kirill_kaprizov_min"
+  },
+  "prev_rank": 15,
+  "cur_rank": 3,
+  "season_ranks": "",
+  "stat_chips": [
+    {
+      "label": "Points",
+      "value": "40"
+    },
+    {
+      "label": "Goals",
+      "value": "17"
+    },
+    {
+      "label": "Plus-minus",
+      "value": "+21"
+    }
+  ],
+  "captions": [
+    "40 points in 23 games",
+    "17 goals, plus-21",
+    "Wild are 16-3-4"
+  ],
+  "instagram_caption": "Kirill Kaprizov jumped from No. 15 to No. 3 on our Hart Trophy board: 40 points in 23 games, 17 goals and a plus-21 for the 16-3-4 Wild. Connor McDavid still holds No. 1. Full board at stingercollectibles.com",
+  "hashtags": [
+    "#StingerNHL",
+    "#HartTrophy",
+    "#KirillKaprizov",
+    "#mnwild",
+    "#NHLStats"
+  ],
+  "script_model": "hand-written",
+  "script_words": 64,
+  "warnings": [],
+  "video": "reel_kaprizov_wk08.mp4",
+  "duration_s": 27,
+  "release_tag": "reel-latest",
+  "release_asset": "nhl_reel_kaprizov_wk08_2027_wk08.mp4",
+  "updated_utc": "2026-11-19 19:30"
+}
