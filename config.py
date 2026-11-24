@@ -78,14 +78,21 @@ REEL_MODEL     = "claude-opus-5-5"   # narration script (chips stay on Haiku)
 REEL_SIZE      = (1080, 1920)
 REEL_FPS       = 30
 # (scene, start s, end s). The script's beats are labelled with these windows, so they stay in sync.
-REEL_SCENES    = (("hook", 0, 3), ("player", 3, 10), ("why", 10, 18), ("context", 18, 22), ("cta", 22, 25))
-REEL_HOLD_S    = 2         # last frame held so a slightly long voiceover isn't cut off
+# Reworked Nov 2026 for retention (the first reel held viewers ~6 of 27 s): 20 s, hook drawn on frame 0, ends on a
+# comment question. Same shape as the NBA and NFL reels.
+REEL_SCENES    = (("hook", 0, 3), ("proof", 3, 13), ("context", 13, 16), ("ask", 16, 20))
+REEL_HOLD_S    = 1         # last frame held so a slightly long voiceover isn't cut off
 REEL_SAFE_TOP    = 250     # px kept clear of the platform UI (top bar)
 REEL_SAFE_BOTTOM = 400     # px kept clear at the bottom (caption, buttons)
 REEL_SAFE_LEFT   = 60
 REEL_SAFE_RIGHT  = 120     # Instagram's like/comment/share column
-REEL_WORDS     = (60, 75)  # narration length across all five beats
+REEL_WORDS     = (36, 54)  # narration length across all four beats
+REEL_PROOF_MAX_WORDS = 26  # the proof beat: short sentences, one fact each (a 31-word NBA proof read as wordy)
+REEL_WPS       = 3.0       # speaking pace for each beat's word target
+REEL_HOOK_MAX_WORDS = 8    # the first beat: the surprising fact, nothing else
+REEL_ASK_MAX_WORDS  = 14   # the last beat: one comment question
 REEL_TOP_SPOTS = 5         # "top 5" for the climber and drop stories
 REEL_MIN_CLIMB = 2         # spots gained to count as a top-5 climber
 REEL_MIN_DROP  = 3         # spots lost by a former top-5 player to count as a drop
+REEL_LOOKBACK_WEEKS = 3    # the "then" in then-vs-now: up to this many weeks back (or the path hook's week)
 ARCHIVES_TO_KEEP = 4

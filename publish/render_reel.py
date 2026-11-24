@@ -1,11 +1,15 @@
 """
-Weekly Hart Trophy reel (ported from nfl-awards-predictor/src/publish/render_reel.py): one story from the board as a silent 1080×1920 MP4 (25 s + a 2 s hold) and a narration
-script Jeff records over it in CapCut. Posted the day after the static board.
+Weekly Hart Trophy reel (ported from nfl-awards-predictor, reworked with the NBA reel): one story from the board as a silent 1080×1920 MP4 (20 s + a 1 s hold) and a narration
+script Jeff voices over in Instagram. Posted first, the afternoon the board completes; the static board
+posts the next day (order reversed 2026-11-24).
+
+Reworked Nov 2026 for retention: four scenes (hook, proof, context, ask). Frame 0 already shows the hook, the
+player and his rank (no fade-in), and the reel ends on a comment question instead of a spoken URL.
 
     python -m publish.render_reel                       # predictions/{CURRENT_YEAR}/
     python -m publish.render_reel --outdir <replay dir> # a replay folder
     python -m publish.render_reel --frames-only         # one PNG per scene (+ safe-zone guides), no video
-    python -m publish.render_reel --no-script           # skip the API call (no narration, no captions)
+    python -m publish.render_reel --no-script           # skip the API call (no narration; fallback question)
 
 Reads board_hart_latest.csv and .prev_board_hart.csv (movement baseline) from the folder, picks the story
 (reel_story.pick_story), writes the script (reel_script, REEL_MODEL), renders frames with Pillow and pipes
@@ -15,8 +19,9 @@ Outputs ({outdir}/reel/):
   reel_latest.mp4    not committed (.gitignore); the workflow uploads it to the "reel-latest" release
                      as nhl_reel_{season}_wk{NN}.mp4 (reel_meta.json: release_asset)
   reel_script.txt    scene-by-scene script, readable on a phone
-  reel_meta.json     story, player, ranks, caption, hashtags, week
-  frames/            --frames-only: scene PNGs and *_guides.png with the platform UI zones shaded
+  reel_meta.json     story, player, ranks, question, caption, hashtags, week
+  frames/            --frames-only: frame 0, the last frame of each scene, and *_guides.png with the platform
+                     UI zones shaded
 
 Layout keeps everything important inside x 120–960, y 250–1520 (config REEL_SAFE_*).
 """
@@ -40,14 +45,16 @@ from config import (
     BOARD_BACKGROUND, CURRENT_PRED_DIR, REEL_FPS, REEL_HOLD_S, REEL_MODEL, REEL_SAFE_BOTTOM,
     REEL_SAFE_LEFT, REEL_SAFE_RIGHT, REEL_SAFE_TOP, REEL_SCENES, REEL_SIZE, TOP_N,
 )
-from publish.reel_script import generate_reel_script
-from publish.reel_story import Story, load_history, load_prev_ranks, pick_story, rank_history
+from publish.reel_script import fallback_question, finish, generate_reel_script
+from publish.reel_story import (
+    Story, comparison_row, load_history, load_prev_ranks, pick_story, rank_history, season_lows,
+)
 from publish.render_graphics import (
     BLACK, DOWN, GOLD, GREY, HEADSHOTS_DIR, NAVY, UP, WHITE, _font, circle_headshot, draw_movement, fit_text,
     load_headshot, load_headshot_placeholder, load_logo, placeholder_background, player_stats, season_label,
     text_w, wrap_text,
 )
-from publish.stats import STAT_LABELS, format_stat
+from publish.stats import REEL_LABELS, format_stat, per_game, rate_cols, stat_cols
 
 W, H = REEL_SIZE
 CX = W // 2
@@ -55,7 +62,7 @@ SIDE = max(REEL_SAFE_LEFT, REEL_SAFE_RIGHT)       # symmetric margins keep thing
 X0, X1 = SIDE, W - SIDE                           # 120 … 960
 Y0, Y1 = REEL_SAFE_TOP, H - REEL_SAFE_BOTTOM      # 250 … 1520
 MAX_W = X1 - X0
-XFADE = 0.25                                      # crossfade between scenes, seconds
+XFADE = 0.15                                      # crossfade between scenes, seconds (none into the first)
 DURATION = REEL_SCENES[-1][2] + REEL_HOLD_S
 
 F = lru_cache(maxsize=None)(_font)
@@ -171,8 +178,91 @@ def arrow(up: bool, size: int, color) -> Image.Image:
     return img
 
 
+ARROW_WORD = "→"     # in hook text; the reel fonts have no arrow glyph, so it's drawn
+
+
+def _arrow_right(size: int, color=GOLD) -> Image.Image:
+    """A right arrow sized to a line of text at font size `size` (shaft + head), with a black outline."""
+    w, h = int(size * 0.72), int(size * 0.5)
+    img = Image.new("RGBA", (w + 8, h + 8), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    sh = max(6, h // 4)
+    pts = [(4, 4 + h // 2 - sh // 2), (4 + int(w * 0.55), 4 + h // 2 - sh // 2), (4 + int(w * 0.55), 4),
+           (4 + w, 4 + h // 2), (4 + int(w * 0.55), 4 + h), (4 + int(w * 0.55), 4 + h // 2 + sh // 2),
+           (4, 4 + h // 2 + sh // 2)]
+    d.polygon(pts, fill=(*color, 255), outline=(*BLACK, 255), width=4)
+    return img
+
+
+def _word_w(word: str, size: int) -> int:
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    return _arrow_right(size).width if word == ARROW_WORD else text_w(probe, word, F("agency_bold", size))
+
+
+def hook_layout(text: str, max_w: int, max_lines: int, start: int, min_size: int):
+    """Largest size (from start down) at which the hook wraps into max_lines lines; "→" counts as a word."""
+    words = text.split()
+    size = start
+    while True:
+        space = _word_w(" ", size) or size // 4
+        lines, cur, cur_w = [], [], 0
+        for w in words:
+            ww = _word_w(w, size)
+            if cur and cur_w + space + ww > max_w:
+                lines.append(" ".join(cur))
+                cur, cur_w = [w], ww
+            else:
+                cur_w = cur_w + (space if cur else 0) + ww
+                cur.append(w)
+        lines.append(" ".join(cur))
+        if (len(lines) <= max_lines and all(_word_w(w, size) <= max_w for w in words)) or size <= min_size:
+            return size, lines[:max_lines]
+        size -= 4
+
+
+def value_img(value: str, size: int, max_w: int) -> Image.Image:
+    """A card value: plain ("28.2") or then → now ("1-4 → 9-6"), the "now" in white, the "then" in grey,
+    shrunk to fit max_w."""
+    while True:
+        if ARROW_WORD not in value:
+            img = text_img(value, "agency_bold", size, WHITE)
+        else:
+            then, now = (x.strip() for x in value.split(ARROW_WORD, 1))
+            parts = [text_img(then, "agency_bold", int(size * 0.8), GREY), _arrow_right(int(size * 0.8)),
+                     text_img(now, "agency_bold", size, WHITE)]
+            gap = max(10, size // 6)
+            h = max(i.height for i in parts)
+            img = Image.new("RGBA", (sum(i.width for i in parts) + gap * 2, h), (0, 0, 0, 0))
+            x = 0
+            for i in parts:
+                img.alpha_composite(i, (x, h - i.height if i is not parts[1] else (h - i.height) // 2))
+                x += i.width + gap
+        if img.width <= max_w or size <= 48:
+            return img
+        size -= 6
+
+
+def hook_line_img(line: str, size: int) -> Image.Image:
+    """One line of hook text: white with a black stroke, numbers ("No. 30") in gold, "→" drawn."""
+    parts = []
+    for w in line.split():
+        if w == ARROW_WORD:
+            parts.append(_arrow_right(size))
+        else:
+            gold = any(ch.isdigit() for ch in w)
+            parts.append(text_img(w, "agency_bold", size, GOLD if gold else WHITE, 5))
+    space = max(12, size // 4)
+    h = max(i.height for i in parts)
+    img = Image.new("RGBA", (sum(i.width for i in parts) + space * (len(parts) - 1), h), (0, 0, 0, 0))
+    x = 0
+    for i in parts:
+        img.alpha_composite(i, (x, h - i.height if i.height > size * 0.6 else (h - i.height) // 2))
+        x += i.width + space
+    return img
+
+
 # ─────────────────────────────────────────────────────────────────
-# Static layers: turf background and the STINGER / MVP WATCH banner
+# Static layers: rink background and the STINGER / HART TROPHY WATCH banner
 # ─────────────────────────────────────────────────────────────────
 def _source_board() -> Image.Image:
     if BOARD_BACKGROUND.exists():
@@ -216,121 +306,120 @@ def banner(width: int) -> Image.Image:
 class Reel:
     def __init__(self, story: Story, board: pd.DataFrame, cards: List[tuple], script: Optional[dict],
                  season: int, week: int, featured_movement: bool = True):
-        """cards: [(label, value)] for the Why scene. featured_movement=False hides the featured player's
+        """cards: [(label, value)] for the Proof scene. featured_movement=False hides the featured player's
         week-over-week arrow in the top-5 list (a one-off story tells its own before/after)."""
         self.s, self.board, self.cards, self.script = story, board.sort_values("rank"), cards, script
         self.featured_movement = featured_movement
         self.season, self.week = season, week
         self.p = story.player
         self.key = str(self.p["player_key"])
-        self.captions = (script or {}).get("captions") or []
+        self.question = ((script or {}).get("question") or fallback_question(story)).strip()
+        self.then_week = None                # set by make_reel when the cards are then → now
         self.scenes = [(name, start, end, getattr(self, f"scene_{name}")) for name, start, end in REEL_SCENES]
 
-    # 1. Hook
+    def record_line(self) -> str:
+        """Under the stat cards: the team's record (W-L-OTL) and points, as on the board."""
+        line = f"{self.p['team']} {self.p['team_record']}"
+        try:
+            line += f" · {int(self.p['team_points'])} PTS"
+        except (KeyError, TypeError, ValueError):
+            pass
+        return line.upper()
+
+    # 1. Hook: everything is on screen from frame 0 (no fade-ins). The rank flips by 0.8 s, then punches.
     def scene_hook(self, c: Image.Image, t: float):
-        bn = banner(880)
-        put(c, bn, (CX - bn.width // 2, Y0 + 10), prog(t, 0, 0.4))
-        label = f"{season_label(self.season)} HART WATCH · WEEK {self.week}"
-        lab = text_img(label, "agency_bold", 46, BLACK)
-        pill = panel((lab.width + 60, lab.height + 34), 16, (*GOLD, 245), (*BLACK, 255), 3)
-        pill.alpha_composite(lab, (30, 17))
-        put(c, pill, (CX - pill.width // 2, 520), prog(t, 0.2, 0.4))
+        hook = self.s.hook.upper().replace("NO. ", "No. ")      # "No. 3", as on the rank badge
+        size, lines = hook_layout(hook, MAX_W, 2, 124, 76)
+        lh = int(size * 1.08)
+        y = Y0 + 20
+        for line in lines:
+            img = hook_line_img(line, size)
+            put(c, img, (CX - img.width // 2, y))
+            y += lh
+        top = max(y + 30, Y0 + 300)
 
-        size, lines = wrap_fit(self.s.hook.upper(), "agency_bold", 132, MAX_W, 3, 80)
-        a, k = prog(t, 0.5, 0.45), 0.88 + 0.12 * prog(t, 0.5, 0.45)
-        line_h = int(size * 1.12)
-        y = 960 - (len(lines) * line_h) // 2
-        for i, line in enumerate(lines):
-            put_text_c(c, CX, y + i * line_h + line_h // 2, line, "agency_bold", size, WHITE, 5, a, k)
-        bar_w = int(420 * prog(t, 1.0, 0.6))
-        if bar_w > 0:
-            put(c, panel((bar_w, 12), 6, (*GOLD, 255)), (CX - bar_w // 2, y + len(lines) * line_h + 30))
-
-    # 2. Player: headshot, logo, rank counting from last week's to this week's
-    def scene_player(self, c: Image.Image, t: float):
-        a, dy = prog(t, 0, 0.5), int(60 * (1 - prog(t, 0, 0.5)))
-        lg = logo(str(self.p["team"]), 300)
-        put(c, lg, (X1 - lg.width + 20, Y0 + 20 + dy), a * 0.95)
-        hs = headshot(self.key, 740)
-        put(c, hs, (CX - hs.width // 2, Y0 + 60 + dy), a)
-        hs_bot = Y0 + 60 + hs.height
-
-        a2 = prog(t, 0.3, 0.4)
+        hs = headshot(self.key, 600)
+        put(c, hs, (CX - hs.width // 2, top))
+        lg = logo(str(self.p["team"]), 210)
+        put(c, lg, (X1 - lg.width + 10, top - 10), 0.95)
+        bar_y = top + hs.height
         name = str(self.p["player_name"]).upper()
-        bar = panel((MAX_W, 104), 14, (0, 0, 0, 225))
-        put(c, bar, (X0, hs_bot), a2)
-        put_text_c(c, CX, hs_bot + 52, name, "agency_bold", fit_size(name, "agency_bold", 78, MAX_W - 40), WHITE, 0, a2)
-        put_text_c(c, CX, hs_bot + 140, f"{self.p['team']} · {self.p['position']}", "fg_demi", 44, GREY, 0, a2)
+        put(c, panel((MAX_W, 104), 14, (0, 0, 0, 230)), (X0, bar_y))
+        put_text_c(c, CX, bar_y + 52, name, "agency_bold", fit_size(name, "agency_bold", 78, MAX_W - 40), WHITE)
 
         prev, cur = self.s.prev_rank, self.s.cur_rank
-        y_rank = hs_bot + 330
         moving = prev is not None and prev != cur
+        y_rank = bar_y + 104 + 150
         if moving:
-            shown = round(prev + (cur - prev) * prog(t, 1.0, 1.6))
-            caption = self.s.labels[0] if t < 1.0 else self.s.labels[1]
+            shown = prev if t < 0.45 else round(prev + (cur - prev) * prog(t, 0.45, 0.35))
+            caption = self.s.labels[0] if t < 0.8 else self.s.labels[1]
+            scale = 1.0 + 0.22 * (1 - prog(t, 0.8, 0.35)) if t >= 0.8 else 1.0
         else:
-            shown = cur
+            shown, scale = cur, 1.0
             caption = ("HOLDS No. 1" if prev == cur == 1 else "SAME SPOT AS LAST WEEK" if prev == cur
                        else "FIRST BOARD OF THE SEASON" if self.s.reason.startswith("no previous")
                        else "NEW TO OUR TOP 30")
-        a3 = prog(t, 0.6, 0.4)
-        put_text_c(c, CX, y_rank - 120, caption, "fg_demi", 42, GOLD, 0, a3)
-        put_text_c(c, CX, y_rank, f"No. {shown}", "agency_bold", 190, GOLD, 6, a3)
-        if moving:
-            a4 = prog(t, 2.7, 0.35)
+        put_text_c(c, CX, y_rank - 112, caption, "fg_demi", 42, GOLD)
+        put_text_c(c, CX, y_rank, f"No. {shown}", "agency_bold", 180, GOLD, 6, 1.0, scale)
+        if moving and t >= 0.8:
             up = cur < prev
             n = abs(prev - cur)
-            txt = text_img(f"{'UP' if up else 'DOWN'} {n} SPOT{'S' if n != 1 else ''}", "agency_bold", 64,
+            txt = text_img(f"{'UP' if up else 'DOWN'} {n} SPOT{'S' if n != 1 else ''}", "agency_bold", 60,
                            UP if up else DOWN, 3)
-            ar = arrow(up, 54, UP if up else DOWN)
-            x = CX - (ar.width + 18 + txt.width) // 2
-            put(c, ar, (x, y_rank + 130), a4)
-            put(c, txt, (x + ar.width + 18, y_rank + 130 + (ar.height - txt.height) // 2), a4)
+            ar = arrow(up, 50, UP if up else DOWN)
+            x = CX - (ar.width + 16 + txt.width) // 2
+            a = prog(t, 0.8, 0.15)
+            put(c, ar, (x, y_rank + 118), a)
+            put(c, txt, (x + ar.width + 16, y_rank + 118 + (ar.height - txt.height) // 2), a)
+        mark = banner(220)
+        put(c, mark, (CX - mark.width // 2, Y1 - mark.height), 0.9)
 
-    # 3. Why: stat chips one at a time, caption chunks underneath
-    def scene_why(self, c: Image.Image, t: float):
-        a = prog(t, 0, 0.35)
+    # 2. Proof: the stat cards punch in, then the team's record and the board's one-line why
+    def scene_proof(self, c: Image.Image, t: float):
         ring = headshot_circle(self.key, 150)
-        put(c, ring, (X0, Y0 + 20), a)
+        put(c, ring, (X0, Y0 + 20))
         nx = X0 + ring.width + 30
         name = str(self.p["player_name"]).upper()
-        put(c, text_img(name, "agency_bold", fit_size(name, "agency_bold", 64, X1 - nx)), (nx, Y0 + 40), a)
+        put(c, text_img(name, "agency_bold", fit_size(name, "agency_bold", 64, X1 - nx)), (nx, Y0 + 40))
         meta = f"No. {self.s.cur_rank} · {self.p['team']} · {self.p['position']}"
-        put(c, text_img(meta, "fg_demi", 40, GOLD), (nx, Y0 + 120), a)
+        put(c, text_img(meta, "fg_demi", 40, GOLD), (nx, Y0 + 120))
 
+        step, y = 0.45, 470
+        if self.then_week is not None:
+            lab = hook_line_img(f"WEEK {self.then_week} {ARROW_WORD} WEEK {self.week}", 46)
+            put(c, lab, (CX - lab.width // 2, y - 14), prog(t, 0, 0.2))
+            y += 50
         for i, (label, value) in enumerate(self.cards):
-            ai = prog(t, 0.4 + 1.0 * i, 0.5)
-            dx = int(-90 * (1 - ai))
-            y = 470 + i * 170
-            card = panel((MAX_W, 150), 18, (10, 10, 10, 215))
+            ai = prog(t, 0.15 + step * i, 0.25)
+            if ai <= 0:
+                continue
+            card = panel((MAX_W, 150), 18, (10, 10, 10, 220))
             ImageDraw.Draw(card).rounded_rectangle((0, 0, 14, 149), radius=7, fill=(*GOLD, 255))
-            val = text_img(str(value), "agency_bold", 104, WHITE)
+            val = value_img(str(value), 104, MAX_W - 300)
             lab_w = MAX_W - val.width - 124
             lab = text_img(str(label).upper(), "fg_demi", fit_size(str(label).upper(), "fg_demi", 44, lab_w), GOLD)
             card.alpha_composite(lab, (44, (150 - lab.height) // 2))
             card.alpha_composite(val, (MAX_W - val.width - 40, (150 - val.height) // 2))
-            put(c, card, (X0 + dx, y), ai)
-
-        y_cap = 470 + max(3, len(self.cards)) * 170 + 150
-        if self.captions:
-            seg = (REEL_SCENES[2][2] - REEL_SCENES[2][1] - 0.4) / len(self.captions)
-            i = min(len(self.captions) - 1, max(0, int((t - 0.4) // seg)))
-            ac = prog(t, 0.4 + i * seg, 0.25)
-            # one line when it fits at a readable size; a two-line break mid-phrase reads badly
-            size, lines = wrap_fit(self.captions[i], "agency_bold", 84, MAX_W, 1, 64)
-            if fit_text(ImageDraw.Draw(Image.new("RGBA", (1, 1))), self.captions[i], F("agency_bold", size), MAX_W) != self.captions[i]:
-                size, lines = wrap_fit(self.captions[i], "agency_bold", 84, MAX_W, 2, 56)
-            lh = int(size * 1.15)
+            k = 1.06 - 0.06 * ai                                   # a small punch as it lands
+            card = card.resize((int(card.width * k), int(card.height * k)), Image.LANCZOS)
+            put(c, card, (CX - card.width // 2, y + i * 170 + (150 - card.height) // 2), ai)
+        y_rec = y + len(self.cards) * 170 + 40
+        t_rec = 0.15 + step * len(self.cards)
+        if self.then_week is None:           # then → now cards already carry the record
+            rec = self.record_line()
+            put_text_c(c, CX, y_rec, rec, "agency_bold", fit_size(rec, "agency_bold", 60, MAX_W), WHITE, 4, prog(t, t_rec, 0.25))
+        else:
+            y_rec -= 60
+        # the board's one-line why lists stats; with then → now cards the narration explains the move instead
+        if self.then_week is None and isinstance(self.p.get("why_blurb"), str) and self.p["why_blurb"].strip():
+            size, lines = wrap_fit(self.p["why_blurb"], "fg_demi", 46, MAX_W, 3, 34)
             for j, line in enumerate(lines):
-                put_text_c(c, CX, y_cap + j * lh, line, "agency_bold", size, WHITE, 5, ac)
-        elif isinstance(self.p.get("why_blurb"), str) and self.p["why_blurb"].strip():
-            size, lines = wrap_fit(self.p["why_blurb"], "fg_demi", 52, MAX_W, 3, 36)
-            for j, line in enumerate(lines):
-                put_text_c(c, CX, y_cap + j * int(size * 1.2), line, "fg_demi", size, WHITE, 3, prog(t, 3.4, 0.4))
+                put_text_c(c, CX, y_rec + 80 + j * int(size * 1.2), line, "fg_demi", size, GREY, 3,
+                           prog(t, t_rec + 0.5, 0.3))
 
-    # 4. Context: compact top 5, featured player highlighted (shown as a 6th row if outside the top 5)
+    # 3. Context: compact top 5, featured player highlighted (shown as a 6th row if outside the top 5)
     def scene_context(self, c: Image.Image, t: float):
-        put_text_c(c, CX, Y0 + 40, "TOP 5 THIS WEEK", "agency_bold", 76, GOLD, 4, prog(t, 0, 0.3))
+        put_text_c(c, CX, Y0 + 40, "TOP 5 THIS WEEK", "agency_bold", 76, GOLD, 4)
         rows = list(self.board.head(5).iterrows())
         extra = int(self.p["rank"]) > 5
         if extra:
@@ -338,10 +427,10 @@ class Reel:
         row_h, y = 168, Y0 + 110
         for i, (_, r) in enumerate(rows):
             if extra and i == 5:
-                put_text_c(c, CX, y + 14, "· · ·", "agency_bold", 48, GREY, 0, prog(t, 0.7, 0.3))
+                put_text_c(c, CX, y + 14, "· · ·", "agency_bold", 48, GREY, 0, prog(t, 0.45, 0.2))
                 y += 40
-            ai = prog(t, 0.1 + 0.12 * i, 0.35)
-            put(c, self._row(r, str(r["player_key"]) == self.key), (X0 + int(60 * (1 - ai)), y), ai)
+            ai = prog(t, 0.05 + 0.08 * i, 0.25)
+            put(c, self._row(r, str(r["player_key"]) == self.key), (X0 + int(50 * (1 - ai)), y), ai)
             y += row_h
 
     def _row(self, r: pd.Series, featured: bool) -> Image.Image:
@@ -370,18 +459,32 @@ class Reel:
         draw_movement(d, mx, (h - 52) // 2, mv, 44)
         return row
 
-    # 5. Call to action (held for REEL_HOLD_S at the end)
-    def scene_cta(self, c: Image.Image, t: float):
-        a = prog(t, 0, 0.5)
-        bn = banner(880)
-        put(c, bn, (CX - bn.width // 2, Y0 + 60), a)
-        put_text_c(c, CX, 780, "FULL BOARD AT", "fg_demi", 58, WHITE, 0, a)
-        url = "stingercollectibles.com"
-        put_text_c(c, CX, 880, url, "agency_bold", fit_size(url, "agency_bold", 112, MAX_W), GOLD, 5, prog(t, 0.2, 0.5))
-        put_text_c(c, CX, 1030, "Top 30 + On the Bubble, every week", "fg_demi", 44, WHITE, 0, prog(t, 0.5, 0.5))
-        put_text_c(c, CX, 1100, f"Stats through {getattr(self, 'through', '')}", "fg_demi", 40, GREY, 0, prog(t, 0.5, 0.5))
+    # 4. Ask: the comment question, then the brand and URL small (held for REEL_HOLD_S at the end).
+    #    Every animation is done by 1.0 s, when encode() starts holding the frame.
+    def scene_ask(self, c: Image.Image, t: float):
+        ring = headshot_circle(self.key, 220)
+        put(c, ring, (CX - ring.width // 2, Y0 + 20))
+        q = self.question.upper().replace("NO. ", "No. ")             # "No. 1", as everywhere else
+        size, lines = wrap_fit(q, "agency_bold", 120, MAX_W, 4, 70)
+        lh = int(size * 1.1)
+        y = Y0 + 20 + ring.height + 60
+        k = 1.08 - 0.08 * prog(t, 0, 0.3)
+        for i, line in enumerate(lines):
+            put_text_c(c, CX, y + i * lh + lh // 2, line, "agency_bold", size, WHITE, 5, 1.0, k)
+        y = y + len(lines) * lh + 50
+        a = prog(t, 0.35, 0.25)
+        lab = text_img("COMMENT BELOW", "agency_bold", 64, GOLD, 3)
+        ar = arrow(False, 48, GOLD)
+        bob = int(12 * np.sin(np.pi * min(1.0, max(0.0, (t - 0.35) / 0.6))))
+        x = CX - (lab.width + 18 + ar.width) // 2
+        put(c, lab, (x, y), a)
+        put(c, ar, (x + lab.width + 18, y + (lab.height - ar.height) // 2 + bob), a)
+        mark = banner(520)
+        yb = Y1 - mark.height - 70
+        put(c, mark, (CX - mark.width // 2, yb), prog(t, 0.5, 0.3))
+        put_text_c(c, CX, yb + mark.height + 40, "stingercollectibles.com", "fg_demi", 44, WHITE, 0, prog(t, 0.6, 0.3))
 
-    # Frame at absolute time t, with a short crossfade into each scene
+    # Frame at absolute time t; a short crossfade into each scene after the first
     def frame(self, t: float) -> Image.Image:
         idx = next((i for i, (_, s, e, _) in enumerate(self.scenes) if t < e), len(self.scenes) - 1)
         name, start, end, draw = self.scenes[idx]
@@ -406,7 +509,7 @@ def encode(reel: Reel, out: Path) -> Path:
            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
            "-movflags", "+faststart", "-an", str(out)]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    last_scene_static = REEL_SCENES[-1][1] + 1.0      # the CTA's animations are done by then
+    last_scene_static = REEL_SCENES[-1][1] + 1.0      # the ask's animations are done by then
     held = None
     try:
         for i in range(n):
@@ -440,7 +543,10 @@ def guides(img: Image.Image) -> Image.Image:
 
 def save_frames(reel: Reel, frames_dir: Path) -> List[Path]:
     frames_dir.mkdir(parents=True, exist_ok=True)
-    out = []
+    first = reel.frame(0)
+    first.convert("RGB").save(frames_dir / "0_first_frame.png")
+    guides(first).convert("RGB").save(frames_dir / "0_first_frame_guides.png")
+    out = [frames_dir / "0_first_frame.png"]
     for i, (name, start, end, _) in enumerate(reel.scenes, 1):
         img = reel.frame(end - 0.05)
         p = frames_dir / f"{i}_{name}.png"
@@ -457,16 +563,18 @@ def script_text(story: Story, script: Optional[dict], season: int, week: int, ca
              f"Story: {story.story_type} — {story.hook}",
              f"{p['player_name']} ({p['team']} {p['position']}): {prev} -> No. {story.cur_rank}",
              f"Why this story: {story.reason}",
-             f"Video: {DURATION} s ({REEL_SCENES[-1][2]} s + {REEL_HOLD_S} s hold). Post the day after the board.",
+             f"Video: {DURATION} s ({REEL_SCENES[-1][2]} s + {REEL_HOLD_S} s hold). Post this first; the board posts the next day.",
+             "Record over the video in Instagram; add the Captions sticker (most people watch muted).",
              ""]
     if not script:
         lines += ["(No narration: the script step was skipped or failed.)",
-                  f"Stat cards on screen: {', '.join(f'{l} {v}' for l, v in cards)}"]
+                  f"Stat cards on screen: {', '.join(f'{l} {v}' for l, v in cards)}",
+                  f"Question on screen: {fallback_question(story)}"]
         return "\n".join(lines) + "\n"
     lines.append(f"SCRIPT ({script['words']} words)")
     for i, b in enumerate(script["beats"], 1):
         lines += ["", f"SCENE {i} · {b['scene'].upper()} · 0:{b['start']:02d}–0:{b['end']:02d}", b["text"]]
-    lines += ["", "ON-SCREEN CAPTIONS (scene 3)", *[f"- {c}" for c in script["captions"]],
+    lines += ["", "QUESTION ON SCREEN", script["question"],
               "", "INSTAGRAM CAPTION", script["instagram_caption"],
               "", "HASHTAGS", " ".join(script["hashtags"])]
     if script.get("warnings"):
@@ -484,26 +592,42 @@ def _story_from_file(spec: dict, board: pd.DataFrame) -> Story:
                  spec["hook"], spec.get("note", ""), tuple(spec.get("labels", ("LAST WEEK", "THIS WEEK"))))
 
 
-def _prepared_script(spec: dict) -> dict:
-    """A hand-written script from the story file, checked like a generated one."""
-    from publish.reel_script import problems, word_count
-    data = {k: spec["script"][k] for k in ("beats", "captions", "instagram_caption", "hashtags")}
-    windows = {name: (start, end) for name, start, end in REEL_SCENES}
-    for b in data["beats"]:
-        b["start"], b["end"] = windows[b["scene"]]
-    data["words"] = word_count(data)
-    data["warnings"] = problems(data)
-    for w in data["warnings"]:
-        print(f"  [WARN] Reel script: {w}")
-    return data
+def _prepared_script(spec: dict, story: Story) -> dict:
+    """A hand-written script from the story file (beats for REEL_SCENES, question, instagram_caption,
+    hashtags), checked and finished like a generated one."""
+    data = {k: spec["script"].get(k, "" if k != "hashtags" else []) for k in ("beats", "question", "instagram_caption", "hashtags")}
+    return finish(data, story)
+
+
+def then_now_cards(p: pd.Series, then: pd.Series) -> List[tuple]:
+    """Proof cards as then → now: the team's record (skipped for a player traded since then), then the rates for
+    his position that moved most since then (relative change, the ones that
+    went the same way as his rank first): points/goals/assists a game, or a goalie's save %
+    and GAA. Rates, not season totals, which only go up."""
+    p, then = per_game(p), per_game(then)
+    cards = []
+    if str(then.get("team")) == str(p.get("team")):
+        cards.append((f"{p['team']} record", f"{then['team_record']} {ARROW_WORD} {p['team_record']}"))
+    cols = [c for c in rate_cols(p) if c in then and c in p and pd.notna(then[c]) and pd.notna(p[c])]
+
+    up = int(p["rank"]) <= int(then["rank"])           # a climb (or a hold): show the rates that improved first
+
+    def moved(c):
+        a, b = float(then[c]), float(p[c])
+        better = (b < a) if c == "gaa" else (b > a)
+        return (better == up, abs(b - a) / max(abs(a), 1e-9))
+
+    for c in sorted(cols, key=moved, reverse=True)[: 3 - len(cards)]:
+        cards.append((REEL_LABELS.get(c, c), f"{format_stat(c, then[c])} {ARROW_WORD} {format_stat(c, p[c])}"))
+    return cards
 
 
 def make_reel(outdir: Path = CURRENT_PRED_DIR, frames_only: bool = False, write_script: bool = True,
               story_file: Optional[Path] = None) -> Path:
     """The weekly reel, or with story_file a one-off. The story file (JSON) names the board player and the hook,
     and may set story_type, prev_rank/cur_rank, labels (over the rank, before/after), note (facts for the
-    script), cards ([[label, value]] for the Why scene, instead of stat cells), script (hand-written beats,
-    captions, instagram_caption, hashtags; else one is generated) and name. A one-off writes
+    script), cards ([[label, value]] for the Proof scene, instead of stat cells), script (hand-written beats for
+    REEL_SCENES, question, instagram_caption, hashtags; else one is generated) and name. A one-off writes
     reel/reel_{name}.mp4, _script.txt and _meta.json, leaving the weekly files alone."""
     outdir = Path(outdir)
     board = pd.read_csv(outdir / "board_hart_latest.csv")
@@ -513,7 +637,7 @@ def make_reel(outdir: Path = CURRENT_PRED_DIR, frames_only: bool = False, write_
     history = load_history(outdir, week)
     past_no1 = frozenset(history.loc[history["rank"] == 1, "player_key"].astype(str))
     story = _story_from_file(spec, board) if spec else \
-        pick_story(board, load_prev_ranks(outdir / ".prev_board_hart.csv"), past_no1)
+        pick_story(board, load_prev_ranks(outdir / ".prev_board_hart.csv"), past_no1, season_lows(history, week))
     path = rank_history(history, str(story.player["player_key"]))
     print(f"Reel story: {story.story_type} — {story.player['player_name']} "
           f"({'NEW' if story.prev_rank is None else f'No. {story.prev_rank}'} -> No. {story.cur_rank}). {story.reason}")
@@ -521,15 +645,29 @@ def make_reel(outdir: Path = CURRENT_PRED_DIR, frames_only: bool = False, write_
     pool = board[board["rank"] <= TOP_N]
     if int(story.player["rank"]) > TOP_N:
         pool = pd.concat([pool, story.player.to_frame().T])
-    chips = player_stats(story.player, pool, 3)
-    cards = [tuple(c) for c in spec["cards"]] if spec and spec.get("cards") else \
-        [(STAT_LABELS.get(c, c), format_stat(c, story.player.get(c))) for c in chips]
+    # the board card's four stat cells, so the two agree; win % is left out (the record shows it)
+    # the board card's stat cells (3; a goalie gets his own set), win % left out (the record line shows it)
+    chips = [c for c in player_stats(story.player, pool, 4) if c != "team_win_pct"][:3]
+    order = stat_cols(story.player)
+    chips = sorted(chips, key=lambda c: order.index(c) if c in order else 99)   # board order (points first)
+    # Then vs now: his row on an earlier weekly board (the path hook's week, else up to REEL_LOOKBACK_WEEKS back)
+    low = season_lows(history, week).get(str(story.player["player_key"]))
+    prefer = week - low[1] if low and ARROW_WORD in story.hook else None
+    then = None if spec else comparison_row(history, str(story.player["player_key"]), week, prefer_week=prefer,
+                                                     prev_rank=story.prev_rank, cur_rank=story.cur_rank)
+    if spec and spec.get("cards"):
+        cards = [tuple(c) for c in spec["cards"]]
+    elif then is not None:
+        cards = then_now_cards(story.player, then)
+    else:
+        cards = [(REEL_LABELS.get(c, c), format_stat(c, story.player.get(c))) for c in chips]
 
     if spec and spec.get("script"):
-        script = _prepared_script(spec)
+        script = _prepared_script(spec, story)
     else:
-        script = generate_reel_script(story, board, chips, season, week, path) if write_script else None
+        script = generate_reel_script(story, board, cards, season, week, path, then) if write_script else None
     reel = Reel(story, board, cards, script, season, week, featured_movement=spec is None)
+    reel.then_week = None if then is None else int(then["week"])
     reel.through = pd.to_datetime(board["stats_through"].iloc[0]).strftime("%b %-d" if sys.platform != "win32" else "%b %#d")
     reel_dir = outdir / "reel"
     reel_dir.mkdir(parents=True, exist_ok=True)
@@ -543,8 +681,10 @@ def make_reel(outdir: Path = CURRENT_PRED_DIR, frames_only: bool = False, write_
         "story_type": story.story_type, "hook": story.hook, "reason": story.reason,
         "player": {k: str(p[k]) for k in ("player_name", "team", "position", "player_key")},
         "prev_rank": story.prev_rank, "cur_rank": story.cur_rank, "season_ranks": path,
+        "compare_week": None if then is None else int(then["week"]),
         "stat_chips": [{"label": l, "value": v} for l, v in cards],
-        "captions": (script or {}).get("captions", []),
+        "question": (script or {}).get("question") or fallback_question(story),
+        "captions": [],                       # retired with the Nov 2026 rework (no on-screen caption chunks)
         "instagram_caption": (script or {}).get("instagram_caption", ""),
         "hashtags": (script or {}).get("hashtags", []),
         "script_model": ("hand-written" if spec and spec.get("script") else REEL_MODEL) if script else None,

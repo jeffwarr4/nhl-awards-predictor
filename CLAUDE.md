@@ -92,25 +92,43 @@ season history.
 
 ## Weekly reel (`publish/render_reel.py`, port of nfl-awards-predictor)
 
-One story per week as a silent 1080×1920 MP4 (25 s + 2 s hold) plus a narration script Jeff records over it in
-CapCut; posted the day after the board. `python -m publish.render_reel [--outdir DIR] [--frames-only] [--no-script]
-[--story FILE]`; tests: `python -m pytest tests/`.
-- `reel_story.pick_story` (pure) takes the first match: new No. 1 (or "back at No. 1" if he held it on an earlier
+One story per week as a silent 1080×1920 MP4 (20 s + 1 s hold) plus a narration script Jeff voices over in Instagram
+(he adds the Captions sticker there; nothing is burned in). The reel posts first, the afternoon the board completes;
+the static board posts the next day (order reversed 2026-11-24). `python -m publish.render_reel [--outdir DIR]
+[--frames-only] [--no-script] [--story FILE]`; tests: `python -m pytest tests/`.
+
+Reworked Nov 2026 for retention, with the NBA and NFL reels (the first NHL reel held viewers ~6 of 27 s). Four scenes,
+`REEL_SCENES` hook 0–3 / proof 3–13 / context 13–16 / ask 16–20. Frame 0 already shows the hook, headshot and last
+week's rank (no fade-ins), the rank flips by 0.8 s, and the reel ends on a comment question, not a spoken URL.
+- `reel_story.pick_story` (pure) takes the first match: new No. 1 (or "back on top" if he held it on an earlier
   `board_hart_wkNN.csv`), biggest climber into the top 5, 11+ into the top 10, biggest drop by a former top-5
   player, else a profile of No. 1. Players are matched by `player_key`, as in `.prev_board_hart.csv`, so a player
-  traded since last week reads as NEW.
-- `reel_script.py` writes five timed beats in Jeff's first-person voice on `REEL_MODEL` (Opus 5.5; chips stay on
-  Haiku) with the hockey stats, W-L-OTL record and the player's rank on earlier weekly boards. It checks the word
-  count, the closing line, and that no %/odds language slipped in. Settings are `REEL_*` in `config.py`.
-- The background is the board's rink tinted navy (so white text reads on the light ice), and the header band is
-  shown as a gold-bordered badge. Stat cards use `player_stats` (goalies get the goalie set).
-- Outputs in `predictions/{season}/reel/`: `reel_script.txt` and `reel_meta.json` are committed; `reel_latest.mp4`
-  is gitignored and the workflow uploads it to the repo's `reel-latest` release as `nhl_reel_{season}_wk{NN}.mp4`.
-  stinger-website's social-drafts job emails it with the script. Both workflow steps are `continue-on-error`, after
-  the headshot fetch. `nhl_predict_current.py` doesn't render the reel; run it on its own locally.
-- One-off reels (a correction, a feature, or a hand-written week): a story file names the player and hook and can
-  set labels, cards and a script; it writes `reel_<name>.*` beside the weekly files. Upload the MP4 by hand.
-  Week 8 of 2026–27 (Kaprizov, No. 15 → No. 3) was the first, before the workflow step existed.
+  traded since last week reads as NEW. Hooks are short and lead with the number; a climb uses his season path when
+  it's bigger than last week's move ("No. 30 → No. 3 in 3 weeks", `season_lows`). Weeks 5–7 of 2026–27 were
+  backfilled from the dated boards.
+- Then vs now: `comparison_row` picks his row on an earlier weekly board (the path hook's week, else the earliest
+  within `REEL_LOOKBACK_WEEKS` where he was at least as far from this week's rank as last week, so the window covers
+  the move the hook names). `then_now_lines` gives the script his rank, the team record (W-L-OTL) and the record
+  since then (left out after a trade), his rates (`stats.rate_cols`: points/goals/assists a game, or a goalie's save %
+  and GAA) and his points (or wins) since then. `MODEL_NOTE` says in plain words what the model weighs.
+- `reel_script.py` writes four beats in Jeff's first-person voice on `REEL_MODEL` (Opus 5.5, with the API's refusal
+  fallback; chips stay on Haiku), plus the on-screen `question`, the Instagram caption and 5 hashtags. `problems()`
+  checks `REEL_WORDS`, the hook (≤ `REEL_HOOK_MAX_WORDS`, no "our model"), the proof (≤ `REEL_PROOF_MAX_WORDS`), that
+  the last beat (≤ `REEL_ASK_MAX_WORDS`) ends with "?", no filler or spoken link, no odds/betting language or
+  percent (a save % is allowed, win % never), and the caption's closing line. One rewrite request; then `finish()`
+  swaps in `fallback_question()` ("Is McDavid a real Hart contender?"). Tests: `tests/test_reel_script.py`.
+- The Proof scene: with a comparison, a "WEEK 5 → WEEK 8" label and 3 then → now cards (`then_now_cards`: the team
+  record unless he was traded, then the rates that moved most). Without one, 3 stat cards from `player_stats`
+  (goalies get the goalie set, win % left out), the record line and the board's `why_blurb`. The background is the
+  board's rink tinted navy, and the header band is a gold-bordered badge. Settings are `REEL_*` in `config.py`.
+- Outputs in `predictions/{season}/reel/`: `reel_script.txt` and `reel_meta.json` are committed (the meta keeps the
+  keys stinger-website reads and adds `question`); `reel_latest.mp4` is gitignored and the workflow uploads it to
+  the repo's `reel-latest` release as `nhl_reel_{season}_wk{NN}.mp4`. stinger-website's social-drafts job emails it
+  with the script. Both workflow steps are `continue-on-error`, after the headshot fetch. `nhl_predict_current.py`
+  doesn't render the reel; run it on its own locally. Needs anthropic 2.x (`fallbacks`).
+- One-off reels (a correction, a feature): a story file names the player and hook and can set labels, cards and a
+  script (four beats, `question`, caption, hashtags); it writes `reel_<name>.*` beside the weekly files. Upload the
+  MP4 by hand. `story_kaprizov_wk08.json` (Week 8, the first reel) uses the old five-beat script and is history.
 
 ## stinger-assets contract
 
