@@ -111,12 +111,32 @@ week's rank (no fade-ins), the rank flips by 0.8 s, and the reel ends on a comme
   the move the hook names). `then_now_lines` gives the script his rank, the team record (W-L-OTL) and the record
   since then (left out after a trade), his rates (`stats.rate_cols`: points/goals/assists a game, or a goalie's save %
   and GAA) and his points (or wins) since then. `MODEL_NOTE` says in plain words what the model weighs.
-- `reel_script.py` writes four beats in Jeff's first-person voice on `REEL_MODEL` (Opus 5.5, with the API's refusal
-  fallback; chips stay on Haiku), plus the on-screen `question`, the Instagram caption and 5 hashtags. `problems()`
-  checks `REEL_WORDS`, the hook (≤ `REEL_HOOK_MAX_WORDS`, no "our model"), the proof (≤ `REEL_PROOF_MAX_WORDS`), that
-  the last beat (≤ `REEL_ASK_MAX_WORDS`) ends with "?", no filler or spoken link, no odds/betting language or
-  percent (a save % is allowed, win % never), and the caption's closing line. One rewrite request; then `finish()`
-  swaps in `fallback_question()` ("Is McDavid a real Hart contender?"). Tests: `tests/test_reel_script.py`.
+- `reel_script.py` writes four timed beats in Jeff's first-person voice on `REEL_MODEL` (Opus 5.5, with the API's
+  refusal fallback; chips stay on Haiku), plus the on-screen `question`, the Instagram caption and 5 hashtags. v3
+  (Nov 2026) makes it flow: the hook names him ("Kirill Kaprizov: No. 15 to No. 3 in one week."), the whole script uses ONE time window, the proof
+  gives ONE reason after a lead-in that rotates by week (`PROOF_OPENERS`: "So what changed?", "Here's why.", "The reason?", "What happened?", offset per sport by `OPENER_OFFSET` so the three sports differ; the model may skip it when the hook makes the reason obvious, and `problems()` flags any other lead-in) in connected sentences (at most two numbers), the context is the gap to
+  the milestone, and the ask is a yes/no or two-way question about it. `story_frame()` hands the script:
+  - the window: the `comparison_row` week to now ("the last three weeks (Week 8 to Week 11), his last three
+    games"), or "this week" with no earlier board; the hook's ranks are the window's
+  - the driver: `player` if a `REEL_FLAT_STATS` rate (points/goals/assists a game, or a goalie's save % and GAA; absolute amounts; lower GAA is better) moved by at least its
+    amount with his rank; else `team` if the team's points % (W-L-OTL) in the window is `REEL_TEAM_SWING` above/below its
+    rate before (3+ games); else `board` if he played no games in the window (a bye) and players ahead of him
+    dropped; else `unclear`. The script may only claim a cause the driver states.
+  - `crossed()`: the players ahead of him at the window's start who are behind him now (or, for a drop, the
+    reverse), from the window-start board
+  - the milestone (`milestone()`): hold No. 1; catch No. 1 from No. 2-3; the top 3 from 4-5; the top 5 from 6-10;
+    the top 10 from 11+
+  `problems()` checks `REEL_WORDS` (40-50), the hook (≤ `REEL_HOOK_MAX_WORDS`, names him, no "our model"), the
+  proof (≤ `REEL_PROOF_MAX_WORDS`), his full name (suffix optional, accents folded) or a `REEL_NICKNAMES` short
+  name somewhere, no then/since/now without a time anchor in the same sentence (`unanchored_time`: "this week",
+  "Week 8", "three weeks ago", "his last three games"...), a context that doesn't repeat the hook's ranks or name
+  the No. 1 (unless it's a No. 1 story or he's No. 2-3), the last beat ending with "?", no stock phrases or "my
+  model", no probability language (a save % is fine, win % never), and 5 hashtags. The caption's site line is added in code (`caption_with_cta`): whatever site line the model wrote is cut off and "Full board at stingercollectibles.com." follows as its own sentence. The prompt carries two style examples
+  (Jeff's, edited to pass the checks; facts marked as examples only). One rewrite request; then `finish()` swaps in
+  `fallback_question()` about the milestone ("Can Kaprizov catch McDavid?"). The result, `reel_meta.json` and the script file keep the
+  frame, `first_draft_problems` and `rewritten`. `render_reel --script-only` writes just the script and meta (for
+  reviewing scripts on replays); a `--story` file without its own cards now gets the then-vs-now comparison too.
+  Tests: `tests/test_reel_script.py`.
 - The Proof scene: with a comparison, a "WEEK 5 → WEEK 8" label and 3 then → now cards (`then_now_cards`: the team
   record unless he was traded, then the rates that moved most). Without one, 3 stat cards from `player_stats`
   (goalies get the goalie set, win % left out), the record line and the board's `why_blurb`. The background is the
