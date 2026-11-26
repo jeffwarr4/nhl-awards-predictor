@@ -1,31 +1,31 @@
 player_key,rank,rank_delta,movement,player_name,team,position,model_score,games,team_games,goals,assists,points,ppg,pp_goals,shots,plus_minus,atoi,goalie_wins,save_pct,gaa,team_record,team_win_pct,team_points,season,week,stats_through,updated_utc,chips,why_blurb
-connor_mcdavid_edm,1,0,–,Connor McDavid,EDM,C,0.904836,23,23,13,42,55,2.39,1,64,29,23:32,,,,17-3-3,0.85,37,2027,8,2026-11-18,2026-11-19 15:18,Point machine | Shot volume | Winning team,55 points in 23 games (2.39 PTS/GP) and a +29 rating for a 17-3-3 team.
-evan_bouchard_edm,2,1,↑1,Evan Bouchard,EDM,D,0.865279,23,23,12,25,37,1.61,3,59,32,25:18,,,,17-3-3,0.85,37,2027,8,2026-11-18,2026-11-19 15:18,Point machine | Power-play threat | Winning team,Leads the blue line... 
-kirill_kaprizov_min,3,12,↑12,Kirill Kaprizov,MIN,LW,0.820355,23,23,17,23,40,1.74,6,73,21,21:21,,,,16-3-4,0.842,36,2027,8,2026-11-18,2026-11-19 15:18,Point machine | Power-play threat | Shot volume,"40 points in 23 games (1.74/GP), 6 power-play goals, +21 rating, on a team with a .842 win pct."
-cutter_gauthier_ana,4,10,↑10,Cutter Gauthier,ANA,LW,0.741875,21,22,21,8,29,1.38,11,95,1,18:40,,,,11-10-1,0.524,23,2027,8,2026-11-18,2026-11-19 15:18,,
-sebastian_aho_car,5,-3,↓3,Sebastian Aho,CAR,F,0.714448,21,21,12,17,29,1.38,5,58,14,19:40,,,,16-3-2,0.842,34,2027,8,2026-11-18,2026-11-19 15:18,,
-leon_draisaitl_edm,6,6,↑6,Leon Draisaitl,EDM,C,0.676721,23,23,21,23,44,1.91,9,87,25,21:42,,,,17-3-3,0.85,37,2027,8,2026-11-18,2026-11-19 15:18,,
-nathan_mackinnon_col,7,-3,↓3,Nathan MacKinnon,COL,C,0.66694,20,22,10,20,30,1.5,3,71,6,20:13,,,,12-7-3,0.632,27,2027,8,2026-11-18,2026-11-19 15:18,,
-quinn_hughes_min,8,-3,↓3,Quinn Hughes,MIN,D,0.640078,23,23,7,25,32,1.39,2,61,14,27:59,,,,16-3-4,0.842,36,2027,8,2026-11-18,2026-11-19 15:18,,
-nikita_kucherov_tbl,9,-1,↓1,Nikita Kucherov,TBL,RW,0.626724,21,21,8,22,30,1.43,3,67,13,21:03,,,,14-5-2,0.737,30,2027,8,2026-11-18,2026-11-19 15:18,,
-kyle_connor_wpg,10,9,↑9,Kyle Connor,WPG,LW,0.611562,22,22,17,9,26,1.18,7,97,1,21:37,,,,10-9-3,0.526,23,2027,8,2026-11-18,2026-11-19 15:18,,
-matthew_tkachuk_fla,11,-4,↓4,Matthew Tkachuk,FLA,LW,0.605653,23,23,7,25,32,1.39,2,51,2,18:32,,,,12-8-3,0.6,27,2027,8,2026-11-18,2026-11-19 15:18,,7 goals and 51 shots trail Connor's 17 and 97 despite .600 team W%
-matthew_schaefer_nyi,12,,NEW,Matthew Schaefer,NYI,D,0.598616,20,20,9,15,24,1.2,1,74,1,26:48,,,,10-6-4,0.625,24,2027,8,2026-11-18,2026-11-19 15:18,,24 pts in 20 GP (1.20/GP) vs Hughes' 1.39/GP; team 10-6-4
-jason_robertson_dal,13,,NEW,Jason Robertson,DAL,LW,0.582966,21,21,10,14,24,1.14,3,68,12,19:33,,,,13-6-2,0.684,28,2027,8,2026-11-18,2026-11-19 15:18,,24 pts in 21 GP (1.14 PTS/GP) trails Connor's 1.18 despite 13-6-2 team
-leo_carlsson_ana,14,-5,↓5,Leo Carlsson,ANA,C,0.578341,22,22,6,22,28,1.27,2,39,-4,20:26,,,,11-10-1,0.524,23,2027,8,2026-11-18,2026-11-19 15:18,,"Higher PTS/GP than Connor, but 6 goals to his 17 and a .524 team mark"
-jack_eichel_veg,15,-9,↓9,Jack Eichel,VEG,C,0.572651,23,23,9,19,28,1.22,1,62,3,20:25,,,,13-6-4,0.684,30,2027,8,2026-11-18,2026-11-19 15:18,,"Only 9 goals vs Connor's 17, with 19 assists and a .684 team win pct"
-jack_hughes_njd,16,-3,↓3,Jack Hughes,NJD,C,0.569366,22,22,10,17,27,1.23,1,85,11,20:43,,,,15-7-0,0.682,30,2027,8,2026-11-18,2026-11-19 15:18,,
-brandon_hagel_tbl,17,0,–,Brandon Hagel,TBL,LW,0.561711,20,21,13,11,24,1.2,1,80,3,20:32,,,,14-5-2,0.737,30,2027,8,2026-11-18,2026-11-19 15:18,,
-adam_fox_nyr,18,5,↑5,Adam Fox,NYR,D,0.543508,22,22,2,22,24,1.09,1,34,6,22:58,,,,13-8-1,0.619,27,2027,8,2026-11-18,2026-11-19 15:18,,
-david_pastrnak_bos,19,-9,↓9,David Pastrňák,BOS,RW,0.538642,22,22,10,18,28,1.27,3,83,3,20:14,,,,14-7-1,0.667,29,2027,8,2026-11-18,2026-11-19 15:18,,
-jesper_wallstedt_min,20,5,↑5,Jesper Wallstedt,MIN,G,0.513679,20,23,0,0,0,0.0,,,,,15,0.924,1.99,16-3-4,0.842,36,2027,8,2026-11-18,2026-11-19 15:18,,
-roman_josi_nsh,21,1,↑1,Roman Josi,NSH,D,0.502041,22,22,2,21,23,1.05,0,61,1,25:35,,,,11-6-5,0.647,27,2027,8,2026-11-18,2026-11-19 15:18,,
-jake_guentzel_tbl,22,8,↑8,Jake Guentzel,TBL,C,0.482615,21,21,13,13,26,1.24,3,58,15,21:15,,,,14-5-2,0.737,30,2027,8,2026-11-18,2026-11-19 15:18,,
-jackson_lacombe_ana,23,4,↑4,Jackson LaCombe,ANA,D,0.482283,22,22,1,24,25,1.14,1,17,1,26:49,,,,11-10-1,0.524,23,2027,8,2026-11-18,2026-11-19 15:18,,
-mitch_marner_veg,24,,NEW,Mitch Marner,VEG,RW,0.473135,21,23,3,23,26,1.24,1,51,-2,20:25,,,,13-6-4,0.684,30,2027,8,2026-11-18,2026-11-19 15:18,,
-tim_stutzle_ott,25,4,↑4,Tim Stützle,OTT,LW,0.468269,22,22,11,15,26,1.18,2,53,10,21:51,,,,14-6-2,0.7,30,2027,8,2026-11-18,2026-11-19 15:18,,
-mikael_granlund_ana,26,2,↑2,Mikael Granlund,ANA,C,0.464117,21,22,8,18,26,1.24,5,40,1,20:37,,,,11-10-1,0.524,23,2027,8,2026-11-18,2026-11-19 15:18,,
-cale_makar_col,27,-7,↓7,Cale Makar,COL,D,0.460113,19,22,5,18,23,1.21,1,49,4,22:25,,,,12-7-3,0.632,27,2027,8,2026-11-18,2026-11-19 15:18,,
-mikko_rantanen_dal,28,,NEW,Mikko Rantanen,DAL,RW,0.458219,21,21,10,16,26,1.24,2,43,9,20:08,,,,13-6-2,0.684,28,2027,8,2026-11-18,2026-11-19 15:18,,
-andrei_svechnikov_car,29,,NEW,Andrei Svechnikov,CAR,RW,0.450874,21,21,11,10,21,1.0,5,63,12,17:33,,,,16-3-2,0.842,34,2027,8,2026-11-18,2026-11-19 15:18,,
-andrei_vasilevskiy_tbl,30,-4,↓4,Andrei Vasilevskiy,TBL,G,0.44783,16,21,0,0,0,0.0,,,,,10,0.891,2.69,14-5-2,0.737,30,2027,8,2026-11-18,2026-11-19 15:18,,
+connor_mcdavid_edm,1,0,–,Connor McDavid,EDM,C,0.904715,27,27,14,45,59,2.19,1,72,25,23:41,,,,17-6-4,0.739,38,2027,9,2026-11-25,2026-11-26 15:18,Point machine | Shot volume | Winning team,"59 points in 27 games (2.19/GP), 72 shots, +25 rating, on a team with a .739 win percentage."
+sebastian_aho_car,2,3,↑3,Sebastian Aho,CAR,F,0.835435,25,25,13,21,34,1.36,6,66,14,19:39,,,,19-3-3,0.864,41,2027,9,2026-11-25,2026-11-26 15:18,Point producer | Power-play threat | Winning team,"34 points in 25 games with 6 power-play goals, on a club that has won 19 of its 25 games."
+kirill_kaprizov_min,3,0,–,Kirill Kaprizov,MIN,LW,0.834087,27,27,19,30,49,1.81,8,80,27,21:36,,,,18-4-5,0.818,41,2027,9,2026-11-25,2026-11-26 15:18,Point machine | Power-play threat | Shot volume,"49 points in 27 games (1.81/GP), 8 power-play goals, and 80 shots for a team with a .818 win pct."
+evan_bouchard_edm,4,-2,↓2,Evan Bouchard,EDM,D,0.776113,27,27,12,29,41,1.52,3,68,25,25:43,,,,17-6-4,0.739,38,2027,9,2026-11-25,2026-11-26 15:18,,
+jack_eichel_veg,5,10,↑10,Jack Eichel,VEG,C,0.720678,26,26,11,22,33,1.27,2,72,-1,20:36,,,,15-6-5,0.714,35,2027,9,2026-11-25,2026-11-26 15:18,,
+kyle_connor_wpg,6,4,↑4,Kyle Connor,WPG,LW,0.706412,26,26,20,15,35,1.35,7,105,8,21:37,,,,13-9-4,0.591,30,2027,9,2026-11-25,2026-11-26 15:18,,
+nikita_kucherov_tbl,7,2,↑2,Nikita Kucherov,TBL,RW,0.702222,24,24,10,23,33,1.38,4,74,9,21:03,,,,15-7-2,0.682,32,2027,9,2026-11-25,2026-11-26 15:18,,
+jack_hughes_njd,8,8,↑8,Jack Hughes,NJD,C,0.688116,25,25,10,20,30,1.2,1,92,12,20:54,,,,17-8-0,0.68,34,2027,9,2026-11-25,2026-11-26 15:18,,
+matthew_tkachuk_fla,9,2,↑2,Matthew Tkachuk,FLA,LW,0.654628,25,25,7,26,33,1.32,2,60,2,18:21,,,,14-8-3,0.636,31,2027,9,2026-11-25,2026-11-26 15:18,,
+cutter_gauthier_ana,10,-6,↓6,Cutter Gauthier,ANA,LW,0.628062,25,26,23,9,32,1.28,12,105,0,18:50,,,,12-13-1,0.48,25,2027,9,2026-11-25,2026-11-26 15:18,,
+mark_scheifele_wpg,11,,NEW,Mark Scheifele,WPG,C,0.625546,26,26,9,24,33,1.27,2,56,13,21:35,,,,13-9-4,0.591,30,2027,9,2026-11-25,2026-11-26 15:18,,9 goals and 2 power-play goals trail Gauthier's 23 and 12
+nathan_mackinnon_col,12,-5,↓5,Nathan MacKinnon,COL,C,0.603512,20,24,10,20,30,1.5,3,71,6,20:13,,,,14-7-3,0.667,31,2027,9,2026-11-25,2026-11-26 15:18,,"Only 10 goals vs. Gauthier's 23, despite a 1.50 PTS/GP pace"
+tage_thompson_buf,13,,NEW,Tage Thompson,BUF,C,0.588853,25,25,17,13,30,1.2,5,97,13,19:46,,,,11-10-4,0.524,26,2027,9,2026-11-25,2026-11-26 15:18,,"+13 rating and 11-10-4 team, but 30 PTS trails Gauthier's 32"
+matt_boldy_min,14,,NEW,Matt Boldy,MIN,LW,0.561867,27,27,14,18,32,1.19,3,107,25,21:28,,,,18-4-5,0.818,41,2027,9,2026-11-25,2026-11-26 15:18,,Trails Gauthier in goals (14-23) and PP goals (3-12) despite 18-4-5 team
+david_pastrnak_bos,15,4,↑4,David Pastrňák,BOS,RW,0.554254,24,24,11,21,32,1.33,3,88,2,20:07,,,,15-8-1,0.652,31,2027,9,2026-11-25,2026-11-26 15:18,,Ties Gauthier's 32 pts on 11 goals to his 23; team's .652 W% helps
+quinn_hughes_min,16,-8,↓8,Quinn Hughes,MIN,D,0.534945,24,27,8,26,34,1.42,2,63,15,27:49,,,,18-4-5,0.818,41,2027,9,2026-11-25,2026-11-26 15:18,,
+jesper_wallstedt_min,17,3,↑3,Jesper Wallstedt,MIN,G,0.525001,23,27,0,0,0,0.0,,,,,16,0.92,2.08,18-4-5,0.818,41,2027,9,2026-11-25,2026-11-26 15:18,,
+leon_draisaitl_edm,18,-12,↓12,Leon Draisaitl,EDM,C,0.524302,27,27,23,24,47,1.74,10,99,21,22:05,,,,17-6-4,0.739,38,2027,9,2026-11-25,2026-11-26 15:18,,
+tim_stutzle_ott,19,6,↑6,Tim Stützle,OTT,LW,0.518395,26,26,13,18,31,1.19,2,58,12,21:53,,,,16-7-3,0.696,35,2027,9,2026-11-25,2026-11-26 15:18,,
+matthew_schaefer_nyi,20,-8,↓8,Matthew Schaefer,NYI,D,0.500873,24,24,9,17,26,1.08,1,86,-2,26:54,,,,12-7-5,0.632,29,2027,9,2026-11-25,2026-11-26 15:18,,
+martin_necas_col,21,,NEW,Martin Nečas,COL,C,0.500576,24,24,11,18,29,1.21,3,54,14,19:39,,,,14-7-3,0.667,31,2027,9,2026-11-25,2026-11-26 15:18,,
+auston_matthews_tor,22,,NEW,Auston Matthews,TOR,C,0.49799,26,26,14,20,34,1.31,5,82,12,20:50,,,,9-14-3,0.391,21,2027,9,2026-11-25,2026-11-26 15:18,,
+adam_fox_nyr,23,-5,↓5,Adam Fox,NYR,D,0.490118,24,24,2,25,27,1.12,1,38,2,22:54,,,,13-10-1,0.565,27,2027,9,2026-11-25,2026-11-26 15:18,,
+logan_stankoven_car,24,,NEW,Logan Stankoven,CAR,C,0.487996,25,25,11,13,24,0.96,1,70,22,16:40,,,,19-3-3,0.864,41,2027,9,2026-11-25,2026-11-26 15:18,,
+cale_makar_col,25,2,↑2,Cale Makar,COL,D,0.487919,20,24,5,21,26,1.3,1,53,7,22:30,,,,14-7-3,0.667,31,2027,9,2026-11-25,2026-11-26 15:18,,
+jake_oettinger_dal,26,,NEW,Jake Oettinger,DAL,G,0.487361,19,24,0,0,0,0.0,,,,,13,0.912,2.07,15-7-2,0.682,32,2027,9,2026-11-25,2026-11-26 15:18,,
+jake_guentzel_tbl,27,-5,↓5,Jake Guentzel,TBL,C,0.461237,24,24,13,16,29,1.21,3,62,12,21:15,,,,15-7-2,0.682,32,2027,9,2026-11-25,2026-11-26 15:18,,
+brandon_hagel_tbl,28,-11,↓11,Brandon Hagel,TBL,LW,0.458036,21,24,13,11,24,1.14,1,83,1,20:30,,,,15-7-2,0.682,32,2027,9,2026-11-25,2026-11-26 15:18,,
+jason_robertson_dal,29,-16,↓16,Jason Robertson,DAL,LW,0.452944,24,24,10,16,26,1.08,3,74,13,19:52,,,,15-7-2,0.682,32,2027,9,2026-11-25,2026-11-26 15:18,,
+mitch_marner_veg,30,-6,↓6,Mitch Marner,VEG,RW,0.450394,24,26,4,25,29,1.21,1,62,-1,20:40,,,,15-6-5,0.714,35,2027,9,2026-11-25,2026-11-26 15:18,,

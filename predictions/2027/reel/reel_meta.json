@@ -1,66 +1,66 @@
 {
   "sport": "nhl",
   "season": 2027,
-  "through_week": 8,
-  "stats_through": "2026-11-18",
+  "through_week": 9,
+  "stats_through": "2026-11-25",
   "story_type": "top5_climber",
-  "hook": "Up 12 spots",
-  "reason": "Kirill Kaprizov climbed 12 spots into the top 5",
+  "hook": "Up 10 spots",
+  "reason": "Jack Eichel climbed 10 spots into the top 5",
   "player": {
-    "player_name": "Kirill Kaprizov",
-    "team": "MIN",
-    "position": "LW",
-    "player_key": "kirill_kaprizov_min"
+    "player_name": "Jack Eichel",
+    "team": "VEG",
+    "position": "C",
+    "player_key": "jack_eichel_veg"
   },
   "prev_rank": 15,
-  "cur_rank": 3,
-  "season_ranks": "Week 5: No. 7, Week 6: No. 5, Week 7: No. 15",
-  "compare_week": 7,
+  "cur_rank": 5,
+  "season_ranks": "Week 5: No. 6, Week 6: No. 4, Week 7: No. 6, Week 8: No. 15",
+  "compare_week": 8,
   "stat_chips": [
     {
-      "label": "MIN record",
-      "value": "13-3-4 → 16-3-4"
+      "label": "VEG record",
+      "value": "13-6-4 → 15-6-5"
     },
     {
-      "label": "Assists / game",
-      "value": "0.75 → 1.00"
+      "label": "Goals / game",
+      "value": "0.39 → 0.42"
     },
     {
       "label": "Points / game",
-      "value": "1.60 → 1.74"
+      "value": "1.22 → 1.27"
     }
   ],
-  "question": "Can Kaprizov catch McDavid for No. 1?",
+  "question": "Can Jack Eichel crack the top 3?",
   "script_frame": {
-    "window": "the last week (Week 7 to Week 8), his last three games",
+    "window": "the last week (Week 8 to Week 9), his last three games",
     "start_rank": 15,
-    "driver": "player",
-    "opener": "The reason?",
+    "driver": "unclear",
+    "opener": "What happened?",
     "crossed": [
-      "Cutter Gauthier",
-      "Jack Hughes",
-      "Leon Draisaitl"
+      "Leo Carlsson",
+      "Jason Robertson",
+      "Matthew Schaefer"
     ],
-    "milestone": "No. 1",
-    "milestone_player": "Connor McDavid"
+    "milestone": "top 3",
+    "milestone_player": "Kirill Kaprizov"
   },
   "first_draft_problems": [],
   "rewritten": false,
   "captions": [],
-  "instagram_caption": "Can Kaprizov catch McDavid for No. 1? Kirill Kaprizov went from No. 15 to No. 3 on our Hart Trophy board in one week. Full board at stingercollectibles.com.",
+  "instagram_caption": "Can Jack Eichel crack the top 3? He jumped from No. 15 to No. 5 on our Hart Trophy board in one week. Full board at stingercollectibles.com.",
   "hashtags": [
     "#StingerNHL",
-    "#KirillKaprizov",
+    "#JackEichel",
     "#HartTrophy",
-    "#mnwild",
+    "#VegasBorn",
     "#NHL"
   ],
   "script_model": "claude-opus-5-5",
-  "script_words": 49,
+  "script_words": 43,
   "warnings": [],
   "video": "reel_latest.mp4",
   "duration_s": 21,
   "release_tag": "reel-latest",
-  "release_asset": "nhl_reel_2027_wk08.mp4",
-  "updated_utc": "2026-11-24 22:56"
+  "release_asset": "nhl_reel_2027_wk09.mp4",
+  "updated_utc": "2026-11-26 15:19"
 }

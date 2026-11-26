@@ -1,11 +1,11 @@
 player_key,rank,rank_delta,movement,player_name,team,position,model_score,games,team_games,goals,assists,points,ppg,pp_goals,shots,plus_minus,atoi,goalie_wins,save_pct,gaa,team_record,team_win_pct,team_points,season,week,stats_through,updated_utc,chips,why_blurb
-connor_mcdavid_edm,1,0,–,Connor McDavid,EDM,C,0.904836,23,23,13,42,55,2.39,1,64,29,23:32,,,,17-3-3,0.85,37,2027,8,2026-11-18,2026-11-19 15:18,Point machine | Shot volume | Winning team,55 points in 23 games (2.39 PTS/GP) and a +29 rating for a 17-3-3 team.
-evan_bouchard_edm,2,1,↑1,Evan Bouchard,EDM,D,0.865279,23,23,12,25,37,1.61,3,59,32,25:18,,,,17-3-3,0.85,37,2027,8,2026-11-18,2026-11-19 15:18,Point machine | Power-play threat | Winning team,Leads the blue line... 
-kirill_kaprizov_min,3,12,↑12,Kirill Kaprizov,MIN,LW,0.820355,23,23,17,23,40,1.74,6,73,21,21:21,,,,16-3-4,0.842,36,2027,8,2026-11-18,2026-11-19 15:18,Point machine | Power-play threat | Shot volume,"40 points in 23 games (1.74/GP), 6 power-play goals, +21 rating, on a team with a .842 win pct."
-cutter_gauthier_ana,4,10,↑10,Cutter Gauthier,ANA,LW,0.741875,21,22,21,8,29,1.38,11,95,1,18:40,,,,11-10-1,0.524,23,2027,8,2026-11-18,2026-11-19 15:18,,
-sebastian_aho_car,5,-3,↓3,Sebastian Aho,CAR,F,0.714448,21,21,12,17,29,1.38,5,58,14,19:40,,,,16-3-2,0.842,34,2027,8,2026-11-18,2026-11-19 15:18,,
-leon_draisaitl_edm,6,6,↑6,Leon Draisaitl,EDM,C,0.676721,23,23,21,23,44,1.91,9,87,25,21:42,,,,17-3-3,0.85,37,2027,8,2026-11-18,2026-11-19 15:18,,
-nathan_mackinnon_col,7,-3,↓3,Nathan MacKinnon,COL,C,0.66694,20,22,10,20,30,1.5,3,71,6,20:13,,,,12-7-3,0.632,27,2027,8,2026-11-18,2026-11-19 15:18,,
-quinn_hughes_min,8,-3,↓3,Quinn Hughes,MIN,D,0.640078,23,23,7,25,32,1.39,2,61,14,27:59,,,,16-3-4,0.842,36,2027,8,2026-11-18,2026-11-19 15:18,,
-nikita_kucherov_tbl,9,-1,↓1,Nikita Kucherov,TBL,RW,0.626724,21,21,8,22,30,1.43,3,67,13,21:03,,,,14-5-2,0.737,30,2027,8,2026-11-18,2026-11-19 15:18,,
-kyle_connor_wpg,10,9,↑9,Kyle Connor,WPG,LW,0.611562,22,22,17,9,26,1.18,7,97,1,21:37,,,,10-9-3,0.526,23,2027,8,2026-11-18,2026-11-19 15:18,,
+connor_mcdavid_edm,1,0,–,Connor McDavid,EDM,C,0.904715,27,27,14,45,59,2.19,1,72,25,23:41,,,,17-6-4,0.739,38,2027,9,2026-11-25,2026-11-26 15:18,Point machine | Shot volume | Winning team,"59 points in 27 games (2.19/GP), 72 shots, +25 rating, on a team with a .739 win percentage."
+sebastian_aho_car,2,3,↑3,Sebastian Aho,CAR,F,0.835435,25,25,13,21,34,1.36,6,66,14,19:39,,,,19-3-3,0.864,41,2027,9,2026-11-25,2026-11-26 15:18,Point producer | Power-play threat | Winning team,"34 points in 25 games with 6 power-play goals, on a club that has won 19 of its 25 games."
+kirill_kaprizov_min,3,0,–,Kirill Kaprizov,MIN,LW,0.834087,27,27,19,30,49,1.81,8,80,27,21:36,,,,18-4-5,0.818,41,2027,9,2026-11-25,2026-11-26 15:18,Point machine | Power-play threat | Shot volume,"49 points in 27 games (1.81/GP), 8 power-play goals, and 80 shots for a team with a .818 win pct."
+evan_bouchard_edm,4,-2,↓2,Evan Bouchard,EDM,D,0.776113,27,27,12,29,41,1.52,3,68,25,25:43,,,,17-6-4,0.739,38,2027,9,2026-11-25,2026-11-26 15:18,,
+jack_eichel_veg,5,10,↑10,Jack Eichel,VEG,C,0.720678,26,26,11,22,33,1.27,2,72,-1,20:36,,,,15-6-5,0.714,35,2027,9,2026-11-25,2026-11-26 15:18,,
+kyle_connor_wpg,6,4,↑4,Kyle Connor,WPG,LW,0.706412,26,26,20,15,35,1.35,7,105,8,21:37,,,,13-9-4,0.591,30,2027,9,2026-11-25,2026-11-26 15:18,,
+nikita_kucherov_tbl,7,2,↑2,Nikita Kucherov,TBL,RW,0.702222,24,24,10,23,33,1.38,4,74,9,21:03,,,,15-7-2,0.682,32,2027,9,2026-11-25,2026-11-26 15:18,,
+jack_hughes_njd,8,8,↑8,Jack Hughes,NJD,C,0.688116,25,25,10,20,30,1.2,1,92,12,20:54,,,,17-8-0,0.68,34,2027,9,2026-11-25,2026-11-26 15:18,,
+matthew_tkachuk_fla,9,2,↑2,Matthew Tkachuk,FLA,LW,0.654628,25,25,7,26,33,1.32,2,60,2,18:21,,,,14-8-3,0.636,31,2027,9,2026-11-25,2026-11-26 15:18,,
+cutter_gauthier_ana,10,-6,↓6,Cutter Gauthier,ANA,LW,0.628062,25,26,23,9,32,1.28,12,105,0,18:50,,,,12-13-1,0.48,25,2027,9,2026-11-25,2026-11-26 15:18,,

@@ -1,0 +1,11 @@
+player_key,rank,rank_delta,movement,player_name,team,position,model_score,games,team_games,goals,assists,points,ppg,pp_goals,shots,plus_minus,atoi,goalie_wins,save_pct,gaa,team_record,team_win_pct,team_points,season,week,stats_through,updated_utc,chips,why_blurb
+connor_mcdavid_edm,1,0,–,Connor McDavid,EDM,C,0.904715,27,27,14,45,59,2.19,1,72,25,23:41,,,,17-6-4,0.739,38,2027,9,2026-11-25,2026-11-26 15:18,,
+sebastian_aho_car,2,3,↑3,Sebastian Aho,CAR,F,0.835435,25,25,13,21,34,1.36,6,66,14,19:39,,,,19-3-3,0.864,41,2027,9,2026-11-25,2026-11-26 15:18,,
+kirill_kaprizov_min,3,0,–,Kirill Kaprizov,MIN,LW,0.834087,27,27,19,30,49,1.81,8,80,27,21:36,,,,18-4-5,0.818,41,2027,9,2026-11-25,2026-11-26 15:18,,
+evan_bouchard_edm,4,-2,↓2,Evan Bouchard,EDM,D,0.776113,27,27,12,29,41,1.52,3,68,25,25:43,,,,17-6-4,0.739,38,2027,9,2026-11-25,2026-11-26 15:18,,
+jack_eichel_veg,5,10,↑10,Jack Eichel,VEG,C,0.720678,26,26,11,22,33,1.27,2,72,-1,20:36,,,,15-6-5,0.714,35,2027,9,2026-11-25,2026-11-26 15:18,,
+kyle_connor_wpg,6,4,↑4,Kyle Connor,WPG,LW,0.706412,26,26,20,15,35,1.35,7,105,8,21:37,,,,13-9-4,0.591,30,2027,9,2026-11-25,2026-11-26 15:18,,
+nikita_kucherov_tbl,7,2,↑2,Nikita Kucherov,TBL,RW,0.702222,24,24,10,23,33,1.38,4,74,9,21:03,,,,15-7-2,0.682,32,2027,9,2026-11-25,2026-11-26 15:18,,
+jack_hughes_njd,8,8,↑8,Jack Hughes,NJD,C,0.688116,25,25,10,20,30,1.2,1,92,12,20:54,,,,17-8-0,0.68,34,2027,9,2026-11-25,2026-11-26 15:18,,
+matthew_tkachuk_fla,9,2,↑2,Matthew Tkachuk,FLA,LW,0.654628,25,25,7,26,33,1.32,2,60,2,18:21,,,,14-8-3,0.636,31,2027,9,2026-11-25,2026-11-26 15:18,,
+cutter_gauthier_ana,10,-6,↓6,Cutter Gauthier,ANA,LW,0.628062,25,26,23,9,32,1.28,12,105,0,18:50,,,,12-13-1,0.48,25,2027,9,2026-11-25,2026-11-26 15:18,,
