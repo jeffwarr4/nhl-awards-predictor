@@ -1,0 +1,19 @@
+{
+  "name": "eichel_wk09",
+  "story_type": "top5_climber",
+  "player_name": "Jack Eichel",
+  "prev_rank": 15,
+  "hook": "Up 10 spots",
+  "note": "Week 9 (Nov 2026): the weekly picker's story with Jeff's tightened, hand-written script. Same video as the weekly reel except the on-screen question.",
+  "script": {
+    "beats": [
+      {"scene": "hook", "text": "Golden Knights' Jack Eichel: No. 15 to No. 5 in one week."},
+      {"scene": "proof", "text": "Five points in his last three games, and Vegas didn't lose any of them in regulation."},
+      {"scene": "context", "text": "That has him lurking just outside our top 3, behind Bouchard and Kaprizov."},
+      {"scene": "ask", "text": "Vegas fans, is Eichel a real Hart contender?"}
+    ],
+    "question": "Vegas fans, is Eichel a real Hart contender?",
+    "instagram_caption": "Vegas fans, is Eichel a real Hart contender? Jack Eichel jumped from No. 15 to No. 5 on our Hart Trophy board in one week.",
+    "hashtags": ["#StingerNHL", "#JackEichel", "#HartTrophy", "#VegasBorn", "#NHL"]
+  }
+}
