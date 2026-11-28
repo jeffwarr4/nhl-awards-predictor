@@ -163,11 +163,13 @@ ANCHOR = re.compile(
     rf"|\b(?:his|the|those|these|that) (?:last |past )?(?:{_NUMW} )?(?:games?|weeks?|stretch)\b",
     re.IGNORECASE,
 )
+# A hook that reads like a label: "Jack Eichel: No. 15 to No. 5" (a colon, or "No." before a rank)
+ROBOT_HOOK = re.compile(r":|\bNo\.\s*\d", re.IGNORECASE)
 _NUM_WORDS = "one two three four five six seven eight nine ten eleven twelve".split()
 
 SCENE_NOTES = {
-    "hook":    "Hook. On screen from the very first frame: his headshot, the hook text and his rank flipping. Say his "
-               "name, then the hook fact, in the script's time period.",
+    "hook":    "Hook. On screen from the very first frame: his headshot, the hook text and his rank flipping. One natural "
+               "spoken sentence: his name, a verb and the move (\"Jack Eichel jumped from 15 to 5 in one week.\").",
     "proof":   "Proof. On screen: the cards listed below punch in one at a time. This week's lead-in (below), then ONE "
                "reason (the driver below), with at most two numbers in one spoken sentence.",
     "context": "Context. On screen: the top 5 this week, featured player highlighted. The gap to the milestone below.",
@@ -181,7 +183,7 @@ Write for speaking aloud: full sentences that flow into each other, never fragme
 
 Four beats, one per scene, {lo}-{hi} words in total:
 
-1. hook ({hook_max} words or fewer): the player's name, then the hook fact, e.g. "Dak Prescott: No. 17 to No. 10 in three weeks." Use his full name, or the short name the user message gives if fans know him by it (Giannis, Wemby). That name must be in the voiceover. No "our model" in the hook.
+1. hook ({hook_max} words or fewer): one natural sentence, the way a fan would say it out loud: his name, a verb and the move, e.g. "Jack Eichel jumped from 15 to 5 in one week." or "Brock Purdy is back on top after three weeks." Bare numbers (never "No." in the hook), no colon, no team name before his name. Use his full name, or the short name the user message gives if fans know him by it (Giannis, Wemby). That name must be in the voiceover. No "our model" in the hook.
 
 2. proof ({proof_max} words or fewer): ONE reason. Lead into the reason with this week's lead-in from the user message, or skip the lead-in and go straight to the reason when the hook already makes it obvious. Never use a different lead-in. In a team story, one short line about his own numbers may come first ("His numbers barely moved."). At most two supporting numbers, in one connected spoken sentence. The user message says what drove the move:
    - player: his own production. Give the one number that changed most, before and after.
@@ -202,12 +204,12 @@ Season context: if the user message gives his rank by week, use it only as given
 
 Style examples. THE FACTS IN THEM ARE EXAMPLES ONLY: use only the facts in the user message.
 Example 1, a team-driven climb (NBA):
-  hook:    "Giannis: No. 30 to No. 3 in three weeks."
+  hook:    "Giannis jumped from 30 to 3 in three weeks."
   proof:   "His numbers barely moved: twenty-eight points and nearly thirteen boards a night. The reason? Miami, 1-4 three weeks ago, has gone 8-2 since."
   context: "Only Luka and Wemby are ahead of him on our board."
   ask:     "Giannis or Wemby: who finishes higher?"
 Example 2, a production-driven climb (NFL):
-  hook:    "Dak Prescott: No. 17 to No. 10 in three weeks."
+  hook:    "Dak Prescott climbed from 17 to 10 in three weeks."
   proof:   "Here's why. His last three games: twelve touchdowns, two Dallas wins, and his season rating up from 93 to 101."
   context: "Five spots from our top five, and Mahomes is the one to catch."
   ask:     "Can Dak crack the top 5?"
@@ -659,6 +661,9 @@ def problems(data: dict, story: Optional[Story] = None, board: Optional[pd.DataF
     if len(proof.split()) > REEL_PROOF_MAX_WORDS:
         out.append(f"the proof beat is {len(proof.split())} words; cut it to {REEL_PROOF_MAX_WORDS} or fewer "
                    "(one reason, at most two numbers)")
+    if ROBOT_HOOK.search(hook):
+        out.append('say the hook the way a fan would, as one sentence with a verb and bare numbers: "Jack Eichel '
+                   'jumped from 15 to 5 in one week." (no "No.", no colon)')
     if re.search(r"\bour model\b", hook, re.IGNORECASE):
         out.append('don\'t say "our model" in the hook beat; open with his name and the fact')
     if beats:

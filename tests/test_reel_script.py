@@ -28,7 +28,7 @@ def story(kind="top5_climber", name="Kirill Kaprizov", prev=15):
 
 GOOD = {
     "beats": [
-        {"scene": "hook", "text": "Kirill Kaprizov: No. 15 to No. 3 in one week."},
+        {"scene": "hook", "text": "Kirill Kaprizov jumped from 15 to 3 in one week."},
         {"scene": "proof", "text": "So what changed? His playmaking. He had eight assists in his last three games, "
                                    "and Minnesota won all three."},
         {"scene": "context", "text": "Two spots from No. 1, and McDavid is the one to catch."},
@@ -210,3 +210,12 @@ def test_finish_rewrites_the_caption_ending():
     d["instagram_caption"] = d["question"] + " Up seven spots: Full board at stingercollectibles.com"
     out = finish(d, story(), BOARD, {"ranks": set()})
     assert out["instagram_caption"] == d["question"] + " Up seven spots. Full board at stingercollectibles.com."
+
+
+ROBOT, NATURAL = 'Kirill Kaprizov: No. 15 to No. 3 in one week.', 'Kirill Kaprizov jumped from 15 to 3 in one week.'
+
+
+def test_hook_reads_naturally():
+    p = " || ".join(check(script(hook=ROBOT)))
+    assert "the way a fan would" in p
+    assert not any("the way a fan would" in x for x in check(script(hook=NATURAL)))

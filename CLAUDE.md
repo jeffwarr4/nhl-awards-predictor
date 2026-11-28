@@ -126,7 +126,7 @@ week's rank (no fade-ins), the rank flips by 0.8 s, and the reel ends on a comme
     reverse), from the window-start board
   - the milestone (`milestone()`): hold No. 1; catch No. 1 from No. 2-3; the top 3 from 4-5; the top 5 from 6-10;
     the top 10 from 11+
-  `problems()` checks `REEL_WORDS` (40-50), the hook (≤ `REEL_HOOK_MAX_WORDS`, names him, no "our model"), the
+  `problems()` checks `REEL_WORDS` (40-50), the hook (≤ `REEL_HOOK_MAX_WORDS`, names him, no "our model", and reads like a fan saying it: "Jack Eichel jumped from 15 to 5 in one week." with a verb and bare numbers; `ROBOT_HOOK` flags a colon or "No." before a rank, and the team name before his name is left out as a tongue twister), the
   proof (≤ `REEL_PROOF_MAX_WORDS`), his full name (suffix optional, accents folded) or a `REEL_NICKNAMES` short
   name somewhere, no then/since/now without a time anchor in the same sentence (`unanchored_time`: "this week",
   "Week 8", "three weeks ago", "his last three games"...), a context that doesn't repeat the hook's ranks or name
