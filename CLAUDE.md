@@ -113,7 +113,7 @@ week's rank (no fade-ins), the rank flips by 0.8 s, and the reel ends on a comme
   and GAA) and his points (or wins) since then. `MODEL_NOTE` says in plain words what the model weighs.
 - `reel_script.py` writes four timed beats in Jeff's first-person voice on `REEL_MODEL` (Opus 5.5, with the API's
   refusal fallback; chips stay on Haiku), plus the on-screen `question`, the Instagram caption and 5 hashtags. v3
-  (Nov 2026) makes it flow: the hook names him ("Kirill Kaprizov: No. 15 to No. 3 in one week."), the whole script uses ONE time window, the proof
+  (Nov 2026) makes it flow: the hook names him in one natural sentence ("Kirill Kaprizov jumped from 15 to 3 in one week."), the whole script uses ONE time window, the proof
   gives ONE reason after a lead-in that rotates by week (`PROOF_OPENERS`: "So what changed?", "Here's why.", "The reason?", "What happened?", offset per sport by `OPENER_OFFSET` so the three sports differ; the model may skip it when the hook makes the reason obvious, and `problems()` flags any other lead-in) in connected sentences (at most two numbers), the context is the gap to
   the milestone, and the ask is a yes/no or two-way question about it. `story_frame()` hands the script:
   - the window: the `comparison_row` week to now ("the last three weeks (Week 8 to Week 11), his last three
@@ -158,7 +158,7 @@ Headshots: `nhl/headshots/{player_key}.png` (600×436). Logos: `nhl/logos/{team}
 
 The new stinger-website (Cloudflare) reads `predictions/{season}/board_hart_latest.csv` straight from GitHub (`site/src/_data/awards.json`, `csv` for the NHL entry). Its columns use these board fields by name: `team, position, games, goals, assists, points, ppg, plus_minus, team_record` (team record shown as written), `goalie_wins, save_pct, gaa` for goalie bubble rows, and `rank_delta`/`movement`, `chips`, `why_blurb`. Renaming any of them breaks the page.
 
-`pages/` is the legacy feed for the old Squarespace site, which reads a Google Sheet whose tabs IMPORTDATA those files. Keep it working until that site is retired. `nhl_hart_predictions_v2_latest.csv` must keep exactly `PAGES_COLUMNS` (in `nhl_predict_current.py`); the Sheet derives `mvp_prob` from `Hart_Win_Prob` and `week_label` from `model_run_label`. `top5.csv` / `top6to10.csv` are wide one-row-per-run CSVs (`r1_player`, `r1_team`, …).
+`pages/` is the legacy feed for the old Squarespace site, which reads a Google Sheet whose tabs IMPORTDATA those files. That site is retired: the old Squarespace site was replaced by the Cloudflare site on 2026-11-23, which doesn't read it; keep it until Squarespace is cancelled (early Dec 2026, the rollback window), then it can be retired. `nhl_hart_predictions_v2_latest.csv` must keep exactly `PAGES_COLUMNS` (in `nhl_predict_current.py`); the Sheet derives `mvp_prob` from `Hart_Win_Prob` and `week_label` from `model_run_label`. `top5.csv` / `top6to10.csv` are wide one-row-per-run CSVs (`r1_player`, `r1_team`, …).
 
 ## Data Sources & Scraping
 
